@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Панель администратора - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/admin/dashboard">Панель</a>
+<a href="/admin/customers">Читатели</a>
+<a href="/admin/books">Книги</a>
+<a href="/admin/issues">Выдачи</a>
+<a href="/admin/reports">Отчеты</a>
+<span style="margin-left: auto; color: white;">👨‍💼 {{ user_name or 'Администратор' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <h1 class="card-title">Панель администратора</h1>
+        <p>Добро пожаловать в панель управления библиотекой!</p>
+    </div>
+
+    <!-- Statistics -->
+    <div id="statistics" class="grid grid-4">
+        <div class="stat-card">
+            <div class="stat-value" id="total-customers">-</div>
+            <div class="stat-label">Читателей</div>
+        </div>
+        <div class="stat-card success">
+            <div class="stat-value" id="total-books">-</div>
+            <div class="stat-label">Книг</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="stat-value" id="active-issues">-</div>
+            <div class="stat-label">Активных выдач</div>
+        </div>
+        <div class="stat-card danger">
+            <div class="stat-value" id="overdue-issues">-</div>
+            <div class="stat-label">Просрочено</div>
+        </div>
+    </div>
+
+    <!-- Top Lists -->
+    <div class="grid grid-2">
+        <div class="card">
+            <h2 class="card-title">Топ-5 читателей</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Имя</th>
+                            <th>Книг взято</th>
+                        </tr>
+                    </thead>
+                    <tbody id="top-customers">
+                        <tr><td colspan="3" class="text-center">Загрузка...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Популярные книги</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Название</th>
+                            <th>Выдач</th>
+                        </tr>
+                    </thead>
+                    <tbody id="top-books">
+                        <tr><td colspan="3" class="text-center">Загрузка...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    // Load statistics
+    async function loadStatistics() {
+        try {
+            const stats = await apiCall('/api/statistics');
+            
+            document.getElementById('total-customers').textContent = stats.total_customers;
+            document.getElementById('total-books').textContent = stats.total_books;
+            document.getElementById('active-issues').textContent = stats.active_issues;
+            document.getElementById('overdue-issues').textContent = stats.overdue_issues || 0;
+            
+            // Top customers
+            const customersBody = document.getElementById('top-customers');
+            if (stats.top_customers && stats.top_customers.length > 0) {
+                customersBody.innerHTML = stats.top_customers.map((c, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td>${c.customer_name}</td>
+                        <td>${c.count}</td>
+                    </tr>
+                `).join('');
+            } else {
+                customersBody.innerHTML = '<tr><td colspan="3" class="text-center">Нет данных</td></tr>';
+            }
+            
+            // Top books
+            const booksBody = document.getElementById('top-books');
+            if (stats.top_books && stats.top_books.length > 0) {
+                booksBody.innerHTML = stats.top_books.map((b, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td>${b.book_title}</td>
+                        <td>${b.count}</td>
+                    </tr>
+                `).join('');
+            } else {
+                booksBody.innerHTML = '<tr><td colspan="3" class="text-center">Нет данных</td></tr>';
+            }
+        } catch (error) {
+            showAlert('Ошибка загрузки статистики: ' + error.message, 'danger');
+        }
+    }
+
+    // Load on page load
+    document.addEventListener('DOMContentLoaded', loadStatistics);
+</script>
+{% endblock %}
+

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Мои книги - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/user/dashboard">Главная</a>
+<a href="/user/browse_books">Книги</a>
+<a href="/user/my_books">Мои книги</a>
+<span style="margin-left: auto; color: white;">📖 {{ user_name or 'Читатель' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <h1 class="card-title">Мои книги</h1>
+        
+        <div class="flex gap-2 mb-3">
+            <button class="btn btn-primary" onclick="loadActiveBooks()">📚 На руках</button>
+            <button class="btn" onclick="loadAllBooks()">📖 Вся история</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Название книги</th>
+                        <th>Дата выдачи</th>
+                        <th>Дата возврата</th>
+                        <th>Статус</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody id="books-table">
+                    <tr><td colspan="5" class="text-center">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    const customerId = '{{ customer_id }}';
+
+    async function loadActiveBooks() {
+        try {
+            const issues = await apiCall(`/api/issues?customer_id=${customerId}&status=active`);
+            displayBooks(issues, true);
+        } catch (error) {
+            showAlert('Ошибка загрузки: ' + error.message, 'danger');
+        }
+    }
+
+    async function loadAllBooks() {
+        try {
+            const issues = await apiCall(`/api/issues?customer_id=${customerId}`);
+            displayBooks(issues, false);
+        } catch (error) {
+            showAlert('Ошибка загрузки: ' + error.message, 'danger');
+        }
+    }
+
+    function displayBooks(issues, activeOnly) {
+        const tbody = document.getElementById('books-table');
+        if (issues.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Книги не найдены</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = issues.map(issue => {
+            const daysOut = Math.floor((new Date() - new Date(issue.date_issued)) / (1000 * 60 * 60 * 24));
+            const daysLeft = 14 - daysOut;
+            const isOverdue = issue.status === 'issued' && daysLeft < 0;
+            
+            let statusText = '';
+            let statusColor = '';
+            
+            if (issue.status === 'returned') {
+                statusText = 'Возвращена';
+                statusColor = 'var(--success-color)';
+            } else if (isOverdue) {
+                statusText = `Просрочено на ${Math.abs(daysLeft)} дн.`;
+                statusColor = 'var(--danger-color)';
+            } else {
+                statusText = `Осталось ${daysLeft} дн.`;
+                statusColor = 'var(--warning-color)';
+            }
+
+            return `
+                <tr style="${isOverdue ? 'background-color: #ffebee;' : ''}">
+                    <td><strong>${issue.book_title}</strong></td>
+                    <td>${issue.date_issued}</td>
+                    <td>${issue.date_return || '-'}</td>
+                    <td style="color: ${statusColor}; font-weight: bold;">${statusText}</td>
+                    <td>
+                        ${issue.status === 'issued' ? 
+                            `<button class="btn btn-success" onclick="returnBook(${issue.id})">Вернуть</button>` :
+                            '-'
+                        }
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function returnBook(issueId) {
+        if (!confirm('Вы хотите вернуть эту книгу?')) return;
+
+        try {
+            await apiCall(`/api/issues/${issueId}/return`, { method: 'POST' });
+            showAlert('Книга возвращена!', 'success');
+            loadActiveBooks();
+        } catch (error) {
+            showAlert('Ошибка: ' + error.message, 'danger');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadActiveBooks);
+</script>
+{% endblock %}
+

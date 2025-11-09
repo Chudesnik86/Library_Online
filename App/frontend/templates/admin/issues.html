@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Управление выдачами - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/admin/dashboard">Панель</a>
+<a href="/admin/customers">Читатели</a>
+<a href="/admin/books">Книги</a>
+<a href="/admin/issues">Выдачи</a>
+<a href="/admin/reports">Отчеты</a>
+<span style="margin-left: auto; color: white;">👨‍💼 {{ user_name or 'Администратор' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="flex-between">
+            <h1 class="card-title">Управление выдачами книг</h1>
+            <button class="btn btn-success" onclick="showIssueModal()">➕ Выдать книгу</button>
+        </div>
+
+        <div class="search-bar">
+            <input type="text" class="form-control" id="search-input" placeholder="Поиск..." />
+            <button class="btn btn-primary" onclick="search()">🔍 Поиск</button>
+            <select id="status-filter" class="form-control" style="max-width: 200px;" onchange="loadIssues()">
+                <option value="all">Все выдачи</option>
+                <option value="active" selected>Активные</option>
+                <option value="returned">Возвращенные</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Книга</th>
+                        <th>Читатель</th>
+                        <th>Дата выдачи</th>
+                        <th>Дата возврата</th>
+                        <th>Статус</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="issues-table">
+                    <tr><td colspan="7" class="text-center">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Issue Book Modal -->
+<div id="issue-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="modal-close" onclick="closeIssueModal()">&times;</span>
+            <h2 class="modal-title">Выдать книгу</h2>
+        </div>
+        <form id="issue-form">
+            <div class="form-group">
+                <label>Книга *</label>
+                <select class="form-control" id="book-select" required>
+                    <option value="">Загрузка...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Читатель *</label>
+                <select class="form-control" id="customer-select" required>
+                    <option value="">Загрузка...</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeIssueModal()">Отмена</button>
+                <button type="submit" class="btn btn-success">Выдать</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/admin_issues.js') }}"></script>
+{% endblock %}
+

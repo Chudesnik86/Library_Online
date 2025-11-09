@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Личный кабинет - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/user/dashboard">Главная</a>
+<a href="/user/browse_books">Книги</a>
+<a href="/user/my_books">Мои книги</a>
+<span style="margin-left: auto; color: white;">📖 {{ user_name or 'Читатель' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <h1 class="card-title">Добро пожаловать!</h1>
+        <p id="customer-name">Загрузка...</p>
+    </div>
+
+    <div class="grid grid-3">
+        <div class="stat-card success">
+            <div class="stat-value" id="borrowed-count">-</div>
+            <div class="stat-label">Книг на руках</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="total-borrowed">-</div>
+            <div class="stat-label">Всего взято</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="stat-value" id="available-books">-</div>
+            <div class="stat-label">Доступно книг</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 class="card-title">Мои активные книги</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Дата выдачи</th>
+                        <th>Дней осталось</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody id="active-books">
+                    <tr><td colspan="4" class="text-center">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    const customerId = '{{ customer_id }}';
+
+    async function loadDashboard() {
+        try {
+            // Load customer info
+            const customer = await apiCall(`/api/customers/${customerId}`);
+            document.getElementById('customer-name').textContent = `Читатель: ${customer.name}`;
+
+            // Load customer issues
+            const allIssues = await apiCall(`/api/issues?customer_id=${customerId}`);
+            const activeIssues = await apiCall(`/api/issues?customer_id=${customerId}&status=active`);
+
+            document.getElementById('borrowed-count').textContent = activeIssues.length;
+            document.getElementById('total-borrowed').textContent = allIssues.length;
+
+            // Load available books count
+            const books = await apiCall('/api/books?available=true');
+            document.getElementById('available-books').textContent = books.length;
+
+            // Display active books
+            displayActiveBooks(activeIssues);
+        } catch (error) {
+            showAlert('Ошибка загрузки данных: ' + error.message, 'danger');
+        }
+    }
+
+    function displayActiveBooks(issues) {
+        const tbody = document.getElementById('active-books');
+        if (issues.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center">У вас нет активных книг</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = issues.map(issue => {
+            const daysOut = Math.floor((new Date() - new Date(issue.date_issued)) / (1000 * 60 * 60 * 24));
+            const daysLeft = 14 - daysOut;
+            const isOverdue = daysLeft < 0;
+
+            return `
+                <tr style="${isOverdue ? 'background-color: #ffebee;' : ''}">
+                    <td>${issue.book_title}</td>
+                    <td>${issue.date_issued}</td>
+                    <td>${isOverdue ? `Просрочено на ${Math.abs(daysLeft)} дн.` : `${daysLeft} дн.`}</td>
+                    <td>
+                        <button class="btn btn-success" onclick="returnBook(${issue.id})">Вернуть</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function returnBook(issueId) {
+        if (!confirm('Вы хотите вернуть эту книгу?')) return;
+
+        try {
+            await apiCall(`/api/issues/${issueId}/return`, { method: 'POST' });
+            showAlert('Книга возвращена!', 'success');
+            loadDashboard();
+        } catch (error) {
+            showAlert('Ошибка: ' + error.message, 'danger');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+{% endblock %}
+

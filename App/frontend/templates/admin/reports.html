@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Отчеты - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/admin/dashboard">Панель</a>
+<a href="/admin/customers">Читатели</a>
+<a href="/admin/books">Книги</a>
+<a href="/admin/issues">Выдачи</a>
+<a href="/admin/reports">Отчеты</a>
+<span style="margin-left: auto; color: white;">👨‍💼 {{ user_name or 'Администратор' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <h1 class="card-title">Отчеты библиотеки</h1>
+        
+        <div class="flex gap-2 mb-3">
+            <button class="btn btn-primary" onclick="generateFullReport()">📊 Полный отчет</button>
+            <button class="btn btn-danger" onclick="generateOverdueReport()">⚠️ Просроченные книги</button>
+            <button class="btn" onclick="clearReport()">🗑️ Очистить</button>
+        </div>
+
+        <div id="report-area" style="background: #f8f9fa; padding: 2rem; border-radius: 5px; min-height: 300px;">
+            <p class="text-center" style="color: var(--light-text);">Выберите тип отчета для генерации</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    async function generateFullReport() {
+        try {
+            const report = await apiCall('/api/reports/full');
+            const stats = report.statistics;
+            
+            let html = `
+                <h2>ПОЛНЫЙ ОТЧЕТ БИБЛИОТЕКИ</h2>
+                <p><strong>Дата:</strong> ${new Date().toLocaleString('ru-RU')}</p>
+                <hr>
+                
+                <h3>СТАТИСТИКА</h3>
+                <ul>
+                    <li>Всего читателей: <strong>${stats.total_customers}</strong></li>
+                    <li>Всего книг: <strong>${stats.total_books}</strong></li>
+                    <li>Доступно книг: <strong>${stats.available_books}</strong></li>
+                    <li>Всего выдач: <strong>${stats.total_issues}</strong></li>
+                    <li>Активных выдач: <strong>${stats.active_issues}</strong></li>
+                    <li>Просроченных: <strong>${stats.overdue_issues || 0}</strong></li>
+                </ul>
+                
+                <h3>ТОП-5 ЧИТАТЕЛЕЙ</h3>
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Имя</th>
+                            <th>Книг взято</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            stats.top_customers.forEach((c, i) => {
+                html += `<tr><td>${i+1}</td><td>${c.customer_name}</td><td>${c.count}</td></tr>`;
+            });
+            
+            html += `
+                    </tbody>
+                </table>
+                
+                <h3>ПОПУЛЯРНЫЕ КНИГИ</h3>
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Название</th>
+                            <th>Выдач</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            stats.top_books.forEach((b, i) => {
+                html += `<tr><td>${i+1}</td><td>${b.book_title}</td><td>${b.count}</td></tr>`;
+            });
+            
+            html += `
+                    </tbody>
+                </table>
+                
+                <h3>АКТИВНЫЕ ВЫДАЧИ (${report.active_issues.length})</h3>
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Книга</th>
+                            <th>Читатель</th>
+                            <th>Дата выдачи</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            report.active_issues.slice(0, 10).forEach(issue => {
+                html += `<tr><td>${issue.book_title}</td><td>${issue.customer_name}</td><td>${issue.date_issued}</td></tr>`;
+            });
+            
+            if (report.active_issues.length > 10) {
+                html += `<tr><td colspan="3" class="text-center">... и еще ${report.active_issues.length - 10}</td></tr>`;
+            }
+            
+            html += '</tbody></table>';
+            
+            document.getElementById('report-area').innerHTML = html;
+            showAlert('Отчет сгенерирован!', 'success');
+        } catch (error) {
+            showAlert('Ошибка генерации отчета: ' + error.message, 'danger');
+        }
+    }
+
+    async function generateOverdueReport() {
+        try {
+            const report = await apiCall('/api/reports/overdue');
+            
+            let html = `
+                <h2>ОТЧЕТ О ПРОСРОЧЕННЫХ КНИГАХ</h2>
+                <p><strong>Дата:</strong> ${new Date().toLocaleString('ru-RU')}</p>
+                <p><strong>Срок выдачи:</strong> 14 дней</p>
+                <hr>
+            `;
+            
+            if (report.length === 0) {
+                html += '<p style="color: var(--success-color); font-size: 1.2rem;">✓ Просроченных книг нет!</p>';
+            } else {
+                html += `
+                    <p style="color: var(--danger-color); font-size: 1.2rem;">
+                        ⚠️ Найдено просроченных книг: <strong>${report.length}</strong>
+                    </p>
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Книга</th>
+                                <th>Читатель</th>
+                                <th>Дата выдачи</th>
+                                <th>Дней просрочено</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                report.forEach(item => {
+                    html += `
+                        <tr style="background-color: #ffebee;">
+                            <td>${item.book_title}</td>
+                            <td>${item.customer_name}</td>
+                            <td>${item.date_issued}</td>
+                            <td style="color: var(--danger-color); font-weight: bold;">${item.days_overdue} дней</td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</tbody></table>';
+            }
+            
+            document.getElementById('report-area').innerHTML = html;
+            showAlert('Отчет сгенерирован!', 'success');
+        } catch (error) {
+            showAlert('Ошибка генерации отчета: ' + error.message, 'danger');
+        }
+    }
+
+    function clearReport() {
+        document.getElementById('report-area').innerHTML = 
+            '<p class="text-center" style="color: var(--light-text);">Выберите тип отчета для генерации</p>';
+    }
+</script>
+{% endblock %}
+

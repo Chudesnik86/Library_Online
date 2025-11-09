@@ -1,0 +1,13 @@
+# Library Online - Flask Web Application Requirements
+# Python 3.7+
+
+# Core Framework
+Flask==2.3.3
+Werkzeug==2.3.7
+
+# CORS support
+Flask-CORS==4.0.0
+
+# Production server (optional)
+gunicorn==21.2.0
+waitress==2.1.2

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Управление книгами - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/admin/dashboard">Панель</a>
+<a href="/admin/customers">Читатели</a>
+<a href="/admin/books">Книги</a>
+<a href="/admin/issues">Выдачи</a>
+<a href="/admin/reports">Отчеты</a>
+<span style="margin-left: auto; color: white;">👨‍💼 {{ user_name or 'Администратор' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="flex-between">
+            <h1 class="card-title">Управление книгами</h1>
+            <button class="btn btn-success" onclick="showAddBookModal()">➕ Добавить книгу</button>
+        </div>
+
+        <div class="search-bar">
+            <input type="text" class="form-control" id="search-input" placeholder="Поиск по ID, названию или автору..." />
+            <button class="btn btn-primary" onclick="searchBooks()">🔍 Поиск</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Название</th>
+                        <th>Автор</th>
+                        <th>ISBN</th>
+                        <th>Категория</th>
+                        <th>Всего</th>
+                        <th>Доступно</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="books-table">
+                    <tr><td colspan="8" class="text-center">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Book Modal -->
+<div id="book-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h2 class="modal-title" id="modal-title">Добавить книгу</h2>
+        </div>
+        <form id="book-form">
+            <input type="hidden" id="book-id" />
+            <div class="form-group">
+                <label>ID книги *</label>
+                <input type="text" class="form-control" id="book-id-input" required />
+            </div>
+            <div class="form-group">
+                <label>Название *</label>
+                <input type="text" class="form-control" id="book-title" required />
+            </div>
+            <div class="form-group">
+                <label>Автор</label>
+                <input type="text" class="form-control" id="book-author" />
+            </div>
+            <div class="form-group">
+                <label>ISBN</label>
+                <input type="text" class="form-control" id="book-isbn" />
+            </div>
+            <div class="form-group">
+                <label>Категория</label>
+                <input type="text" class="form-control" id="book-category" />
+            </div>
+            <div class="form-group">
+                <label>Всего экземпляров</label>
+                <input type="number" class="form-control" id="book-total" value="1" min="1" />
+            </div>
+            <div class="form-group">
+                <label>Доступно экземпляров</label>
+                <input type="number" class="form-control" id="book-available" value="1" min="0" />
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal()">Отмена</button>
+                <button type="submit" class="btn btn-success">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/admin_books.js') }}"></script>
+{% endblock %}
+

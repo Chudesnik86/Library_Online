@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Управление читателями - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/admin/dashboard">Панель</a>
+<a href="/admin/customers">Читатели</a>
+<a href="/admin/books">Книги</a>
+<a href="/admin/issues">Выдачи</a>
+<a href="/admin/reports">Отчеты</a>
+<span style="margin-left: auto; color: white;">👨‍💼 {{ user_name or 'Администратор' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="flex-between">
+            <h1 class="card-title">Управление читателями</h1>
+            <button class="btn btn-success" onclick="showAddModal()">➕ Добавить читателя</button>
+        </div>
+
+        <div class="search-bar">
+            <input type="text" class="form-control" id="search-input" placeholder="Поиск по ID, имени или email..." />
+            <button class="btn btn-primary" onclick="search()">🔍 Поиск</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Имя</th>
+                        <th>Адрес</th>
+                        <th>Город</th>
+                        <th>Телефон</th>
+                        <th>Email</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="customers-table">
+                    <tr><td colspan="7" class="text-center">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h2 class="modal-title" id="modal-title">Добавить читателя</h2>
+        </div>
+        <form id="customer-form">
+            <div class="form-group">
+                <label>ID читателя *</label>
+                <input type="text" class="form-control" id="customer-id" required />
+            </div>
+            <div class="form-group">
+                <label>ФИО *</label>
+                <input type="text" class="form-control" id="customer-name" required />
+            </div>
+            <div class="form-group">
+                <label>Адрес</label>
+                <input type="text" class="form-control" id="customer-address" />
+            </div>
+            <div class="form-group">
+                <label>Почтовый индекс</label>
+                <input type="number" class="form-control" id="customer-zip" />
+            </div>
+            <div class="form-group">
+                <label>Город</label>
+                <input type="text" class="form-control" id="customer-city" />
+            </div>
+            <div class="form-group">
+                <label>Телефон</label>
+                <input type="tel" class="form-control" id="customer-phone" />
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" class="form-control" id="customer-email" />
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal()">Отмена</button>
+                <button type="submit" class="btn btn-success">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/admin_customers.js') }}"></script>
+{% endblock %}
+

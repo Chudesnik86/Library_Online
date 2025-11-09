@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Доступные книги - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/user/dashboard">Главная</a>
+<a href="/user/browse_books">Книги</a>
+<a href="/user/my_books">Мои книги</a>
+<span style="margin-left: auto; color: white;">📖 {{ user_name or 'Читатель' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <h1 class="card-title">Доступные книги</h1>
+        
+        <div class="search-bar">
+            <input type="text" class="form-control" id="search-input" placeholder="Поиск книг..." />
+            <button class="btn btn-primary" onclick="searchBooks()">🔍 Поиск</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Автор</th>
+                        <th>Категория</th>
+                        <th>Доступно</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody id="books-table">
+                    <tr><td colspan="5" class="text-center">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    const customerId = '{{ customer_id }}';
+
+    async function loadBooks() {
+        try {
+            const books = await apiCall('/api/books?available=true');
+            displayBooks(books);
+        } catch (error) {
+            showAlert('Ошибка загрузки книг: ' + error.message, 'danger');
+        }
+    }
+
+    function displayBooks(books) {
+        const tbody = document.getElementById('books-table');
+        if (books.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Доступных книг нет</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = books.map(book => `
+            <tr>
+                <td><strong>${book.title}</strong></td>
+                <td>${book.author || 'Не указан'}</td>
+                <td>${book.category || 'Не указана'}</td>
+                <td>${book.available_copies} из ${book.total_copies}</td>
+                <td>
+                    ${book.available_copies > 0 ? 
+                        `<button class="btn btn-success" onclick="borrowBook('${book.id}')">Взять книгу</button>` :
+                        '<span style="color: var(--danger-color);">Недоступна</span>'
+                    }
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function searchBooks() {
+        const searchTerm = document.getElementById('search-input').value;
+        try {
+            const books = await apiCall(`/api/books?search=${encodeURIComponent(searchTerm)}`);
+            displayBooks(books.filter(b => b.available_copies > 0));
+        } catch (error) {
+            showAlert('Ошибка поиска: ' + error.message, 'danger');
+        }
+    }
+
+    async function borrowBook(bookId) {
+        if (!confirm('Вы хотите взять эту книгу?')) return;
+
+        try {
+            await apiCall('/api/issues', {
+                method: 'POST',
+                body: JSON.stringify({
+                    book_id: bookId,
+                    customer_id: customerId
+                })
+            });
+            showAlert('Книга успешно выдана!', 'success');
+            loadBooks();
+        } catch (error) {
+            showAlert('Ошибка: ' + error.message, 'danger');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadBooks);
+    document.getElementById('search-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchBooks();
+    });
+</script>
+{% endblock %}
+
