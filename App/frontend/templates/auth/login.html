@@ -85,6 +85,55 @@
                 toggle.textContent = '👁️';
             }
         }
+
+        // Save JWT token from session to localStorage if available
+        // This happens after successful form login
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if we have a token in the URL (from redirect) or try to get from session
+            // Since we can't directly access Flask session in JS, we'll handle it via form submission
+        });
+
+        // Intercept form submission to get token via AJAX
+        document.querySelector('form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.token) {
+                    // Save token to localStorage
+                    localStorage.setItem('jwt_token', data.token);
+                    
+                    // Redirect based on role
+                    if (data.user.role === 'admin') {
+                        window.location.href = '/admin/dashboard';
+                    } else {
+                        window.location.href = '/user/dashboard';
+                    }
+                } else {
+                    // Show error
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'alert alert-danger';
+                    errorDiv.textContent = data.error || 'Ошибка входа';
+                    document.querySelector('.auth-card').insertBefore(errorDiv, document.querySelector('form'));
+                    setTimeout(() => errorDiv.remove(), 3000);
+                }
+            } catch (error) {
+                // Fallback to regular form submission if AJAX fails
+                e.target.submit();
+            }
+        });
     </script>
 </body>
 </html>

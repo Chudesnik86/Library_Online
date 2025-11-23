@@ -1,13 +1,33 @@
 """
 User routes - Pages for regular users
 """
-from flask import Blueprint, render_template, session, redirect, url_for, flash
+from flask import Blueprint, render_template, session, redirect, url_for, flash, request
+from app.utils.jwt_utils import verify_token, get_token_from_header
 
 user_bp = Blueprint('user', __name__)
 
 
 def require_user():
-    """Check if user is logged in"""
+    """Check if user is logged in (supports both JWT and session)"""
+    # Try JWT token first
+    auth_header = request.headers.get('Authorization')
+    token = get_token_from_header(auth_header)
+    
+    if token:
+        payload = verify_token(token)
+        if payload:
+            # Set session from JWT for template compatibility
+            session['user_id'] = payload.get('user_id')
+            session['user_email'] = payload.get('email')
+            session['user_role'] = payload.get('role')
+            session['user_name'] = payload.get('name')
+            session['customer_id'] = payload.get('customer_id')
+            if not session.get('customer_id'):
+                flash('Ошибка профиля пользователя', 'danger')
+                return redirect(url_for('auth.login'))
+            return None
+    
+    # Fallback to session
     if 'user_id' not in session:
         flash('Требуется авторизация', 'warning')
         return redirect(url_for('auth.login'))

@@ -25,6 +25,52 @@
 
     {% block scripts %}
     <script>
+        // Check and restore JWT token on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            let token = localStorage.getItem('jwt_token');
+            
+            // If no token in localStorage, try to get from session
+            if (!token) {
+                fetch('/auth/api/token')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.token) {
+                            setToken(data.token);
+                            token = data.token;
+                        }
+                    })
+                    .catch(() => {});
+            }
+            
+            if (token && !isTokenExpired(token)) {
+                // Token is valid, verify it with server
+                fetch('/auth/api/verify', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }).then(response => {
+                    if (!response.ok) {
+                        // Token invalid, remove it
+                        removeToken();
+                    }
+                }).catch(() => {
+                    removeToken();
+                });
+            } else if (token) {
+                // Token expired, remove it
+                removeToken();
+            }
+
+            // Add logout handler to all logout links
+            document.querySelectorAll('a[href="/auth/logout"]').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    removeToken();
+                    window.location.href = '/auth/logout';
+                });
+            });
+        });
+
         // Utility functions
         function showAlert(message, type = 'info') {
             const alertDiv = document.createElement('div');
@@ -42,16 +88,58 @@
             }, 3000);
         }
 
-        // API call helper
+        // JWT Token management
+        function getToken() {
+            return localStorage.getItem('jwt_token');
+        }
+
+        function setToken(token) {
+            localStorage.setItem('jwt_token', token);
+        }
+
+        function removeToken() {
+            localStorage.removeItem('jwt_token');
+        }
+
+        function isTokenExpired(token) {
+            if (!token) return true;
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const exp = payload.exp * 1000; // Convert to milliseconds
+                return Date.now() >= exp;
+            } catch (e) {
+                return true;
+            }
+        }
+
+        // API call helper with JWT token support
         async function apiCall(url, options = {}) {
             try {
+                const token = getToken();
+                const headers = {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                };
+
+                // Add JWT token to headers if available
+                if (token && !isTokenExpired(token)) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
                 const response = await fetch(url, {
                     ...options,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...options.headers
-                    }
+                    headers: headers
                 });
+                
+                // If token expired or invalid, try to refresh or redirect to login
+                if (response.status === 401) {
+                    removeToken();
+                    // Only redirect if not already on login page
+                    if (!window.location.pathname.includes('/auth/login')) {
+                        window.location.href = '/auth/login';
+                    }
+                    throw new Error('Требуется авторизация');
+                }
                 
                 const data = await response.json();
                 

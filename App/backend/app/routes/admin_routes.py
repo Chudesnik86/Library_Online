@@ -1,13 +1,30 @@
 """
 Admin routes - Pages for administrator
 """
-from flask import Blueprint, render_template, session, redirect, url_for, flash
+from flask import Blueprint, render_template, session, redirect, url_for, flash, request
+from app.utils.jwt_utils import verify_token, get_token_from_header
 
 admin_bp = Blueprint('admin', __name__)
 
 
 def require_admin():
-    """Check if user is logged in and is admin"""
+    """Check if user is logged in and is admin (supports both JWT and session)"""
+    # Try JWT token first
+    auth_header = request.headers.get('Authorization')
+    token = get_token_from_header(auth_header)
+    
+    if token:
+        payload = verify_token(token)
+        if payload and payload.get('role') == 'admin':
+            # Set session from JWT for template compatibility
+            session['user_id'] = payload.get('user_id')
+            session['user_email'] = payload.get('email')
+            session['user_role'] = payload.get('role')
+            session['user_name'] = payload.get('name')
+            session['customer_id'] = payload.get('customer_id')
+            return None
+    
+    # Fallback to session
     if 'user_id' not in session:
         flash('Требуется авторизация', 'warning')
         return redirect(url_for('auth.login'))

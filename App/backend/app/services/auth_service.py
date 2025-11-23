@@ -4,6 +4,7 @@ Authentication Service - Business logic for authentication
 from typing import Optional, Tuple
 from app.models import User, Customer
 from app.repositories import UserRepository, CustomerRepository
+from app.utils.jwt_utils import generate_token
 
 
 class AuthService:
@@ -89,6 +90,20 @@ class AuthService:
     def get_user_by_id(user_id: int) -> Optional[User]:
         """Get user by ID"""
         return UserRepository.find_by_id(user_id)
+    
+    @staticmethod
+    def generate_user_token(user: User) -> str:
+        """
+        Generate JWT token for user
+        Returns: JWT token string
+        """
+        return generate_token(
+            user_id=user.id,
+            email=user.email,
+            role=user.role,
+            customer_id=user.customer_id,
+            name=user.name
+        )
 
 
 
