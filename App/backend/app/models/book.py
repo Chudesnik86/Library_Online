@@ -15,6 +15,8 @@ class Book:
     category: Optional[str] = None
     total_copies: int = 1
     available_copies: int = 1
+    description: Optional[str] = None
+    cover_image: Optional[str] = None  # URL to cover image
     
     @classmethod
     def from_dict(cls, data: dict):
@@ -26,7 +28,9 @@ class Book:
             isbn=data.get('isbn'),
             category=data.get('category'),
             total_copies=data.get('total_copies', 1),
-            available_copies=data.get('available_copies', 1)
+            available_copies=data.get('available_copies', 1),
+            description=data.get('description'),
+            cover_image=data.get('cover_image')
         )
     
     def to_dict(self):
@@ -38,7 +42,9 @@ class Book:
             'isbn': self.isbn,
             'category': self.category,
             'total_copies': self.total_copies,
-            'available_copies': self.available_copies
+            'available_copies': self.available_copies,
+            'description': self.description,
+            'cover_image': self.cover_image
         }
     
     @property

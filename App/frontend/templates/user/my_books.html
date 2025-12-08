@@ -6,6 +6,7 @@
 <a href="/user/dashboard">Главная</a>
 <a href="/user/browse_books">Книги</a>
 <a href="/user/my_books">Мои книги</a>
+<a href="/user/profile">Профиль</a>
 <span style="margin-left: auto; color: white;">📖 {{ user_name or 'Читатель' }}</span>
 <a href="/auth/logout">Выход</a>
 {% endblock %}
@@ -107,7 +108,8 @@
     }
 
     async function returnBook(issueId) {
-        if (!confirm('Вы хотите вернуть эту книгу?')) return;
+        const confirmed = await confirmAction('Вы хотите вернуть эту книгу?', 'Возврат книги');
+        if (!confirmed) return;
 
         try {
             await apiCall(`/api/issues/${issueId}/return`, { method: 'POST' });

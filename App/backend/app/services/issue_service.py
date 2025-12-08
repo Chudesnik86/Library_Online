@@ -128,9 +128,8 @@ class IssueService:
         stats['total_books'] = len(books)
         stats['available_books'] = len([b for b in books if b.is_available])
         
-        # Add overdue count
-        overdue = IssueService.get_overdue_issues()
-        stats['overdue_issues'] = len(overdue)
+        # Overdue count is already calculated in IssueRepository.get_statistics()
+        # using SQL query for accuracy
         
         return stats
     

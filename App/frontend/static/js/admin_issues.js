@@ -107,7 +107,8 @@ document.getElementById('issue-form').addEventListener('submit', async (e) => {
 });
 
 async function returnBook(issueId) {
-    if (!confirm('Отметить книгу как возвращенную?')) return;
+    const confirmed = await confirmAction('Отметить книгу как возвращенную?', 'Возврат книги');
+    if (!confirmed) return;
 
     try {
         await apiCall(`/api/issues/${issueId}/return`, { method: 'POST' });

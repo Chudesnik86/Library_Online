@@ -3,6 +3,7 @@ Flask application factory
 """
 from flask import Flask
 from flask_cors import CORS
+from flask_swagger_ui import get_swaggerui_blueprint
 
 
 def create_app():
@@ -35,6 +36,22 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(user_bp, url_prefix='/user')
     app.register_blueprint(api_bp, url_prefix='/api')
+    
+    # Swagger UI configuration
+    SWAGGER_URL = '/swagger'
+    API_URL = '/api/swagger.json'
+    
+    swaggerui_blueprint = get_swaggerui_blueprint(
+        SWAGGER_URL,
+        API_URL,
+        config={
+            'app_name': "Library Online API",
+            'docExpansion': 'list',
+            'defaultModelsExpandDepth': 3,
+            'defaultModelExpandDepth': 3,
+        }
+    )
+    app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
     
     return app
 

@@ -6,6 +6,7 @@
 <a href="/user/dashboard">Главная</a>
 <a href="/user/browse_books">Книги</a>
 <a href="/user/my_books">Мои книги</a>
+<a href="/user/profile">Профиль</a>
 <span style="margin-left: auto; color: white;">📖 {{ user_name or 'Читатель' }}</span>
 <a href="/auth/logout">Выход</a>
 {% endblock %}
@@ -30,6 +31,12 @@
             <div class="stat-value" id="available-books">-</div>
             <div class="stat-label">Доступно книг</div>
         </div>
+    </div>
+
+    <!-- Exhibitions Section -->
+    <div id="exhibitions-section" class="card" style="display: none;">
+        <h2 class="card-title">📚 Выставка книг</h2>
+        <div id="exhibitions-container"></div>
     </div>
 
     <div class="card">
@@ -77,9 +84,58 @@
 
             // Display active books
             displayActiveBooks(activeIssues);
+
+            // Load exhibitions
+            await loadExhibitions();
         } catch (error) {
             showAlert('Ошибка загрузки данных: ' + error.message, 'danger');
         }
+    }
+
+    async function loadExhibitions() {
+        try {
+            const exhibitions = await apiCall('/api/exhibitions/active');
+            if (exhibitions && exhibitions.length > 0) {
+                displayExhibitions(exhibitions);
+                document.getElementById('exhibitions-section').style.display = 'block';
+            } else {
+                document.getElementById('exhibitions-section').style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error loading exhibitions:', error);
+            document.getElementById('exhibitions-section').style.display = 'none';
+        }
+    }
+
+    function displayExhibitions(exhibitions) {
+        const container = document.getElementById('exhibitions-container');
+        
+        container.innerHTML = exhibitions.map(exhibition => {
+            const books = exhibition.books || [];
+            if (books.length === 0) return '';
+
+            return `
+                <div class="exhibition-block">
+                    <h3>${exhibition.title}</h3>
+                    ${exhibition.description ? `<p class="exhibition-description">${exhibition.description}</p>` : ''}
+                    <div class="exhibition-books-carousel">
+                        ${books.map(book => `
+                            <div class="exhibition-book-card" onclick="window.location.href='/user/browse_books?book=${book.id}'">
+                                ${book.cover_image ? 
+                                    `<img src="${book.cover_image}" alt="${book.title}" class="exhibition-book-cover" />` : 
+                                    `<div class="exhibition-book-cover-placeholder">📖</div>`
+                                }
+                                <div class="exhibition-book-info">
+                                    <h4>${book.title}</h4>
+                                    <p>${book.author || 'Автор не указан'}</p>
+                                    ${book.description ? `<p class="exhibition-book-description">${book.description.substring(0, 100)}${book.description.length > 100 ? '...' : ''}</p>` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     function displayActiveBooks(issues) {
@@ -108,7 +164,8 @@
     }
 
     async function returnBook(issueId) {
-        if (!confirm('Вы хотите вернуть эту книгу?')) return;
+        const confirmed = await confirmAction('Вы хотите вернуть эту книгу?', 'Возврат книги');
+        if (!confirmed) return;
 
         try {
             await apiCall(`/api/issues/${issueId}/return`, { method: 'POST' });

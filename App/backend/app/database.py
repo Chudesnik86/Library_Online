@@ -1,18 +1,20 @@
 """
 Database initialization and connection management
 """
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import psycopg2.extras
 import json
 import os
 from contextlib import contextmanager
-from config import DATABASE_PATH, SAMPLE_DATA_DIR
+from config import DATABASE_CONFIG, SAMPLE_DATA_DIR
 
 
 @contextmanager
 def get_db_connection():
     """Context manager for database connections"""
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(**DATABASE_CONFIG)
+    conn.set_session(autocommit=False)
     try:
         yield conn
         conn.commit()
@@ -28,60 +30,175 @@ def init_db():
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
-        # Users table for authentication
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                role TEXT DEFAULT 'user',
-                customer_id TEXT,
-                name TEXT,
-                FOREIGN KEY (customer_id) REFERENCES customers(id)
-            )
-        ''')
-        
-        # Customers table
+        # Create tables without foreign keys first
+        # Customers table (no dependencies)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS customers (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
+                id VARCHAR(50) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
                 address TEXT,
                 zip INTEGER,
-                city TEXT,
-                phone TEXT,
-                email TEXT
+                city VARCHAR(255),
+                phone VARCHAR(50),
+                email VARCHAR(255)
             )
         ''')
         
-        # Books table
+        # Books table (no dependencies)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS books (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                author TEXT,
-                isbn TEXT,
-                category TEXT,
+                id VARCHAR(50) PRIMARY KEY,
+                title VARCHAR(500) NOT NULL,
+                author VARCHAR(255),
+                isbn VARCHAR(50),
+                category VARCHAR(255),
                 total_copies INTEGER DEFAULT 1,
-                available_copies INTEGER DEFAULT 1
+                available_copies INTEGER DEFAULT 1,
+                description TEXT,
+                cover_image TEXT
             )
         ''')
         
-        # Issues table (book loans)
+        # Migrate existing books table to add new columns if they don't exist
+        # PostgreSQL doesn't support IF NOT EXISTS for ALTER TABLE, so we check first
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS issues (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                book_id TEXT NOT NULL,
-                book_title TEXT NOT NULL,
-                customer_id TEXT NOT NULL,
-                customer_name TEXT NOT NULL,
-                date_issued DATE NOT NULL,
-                date_return DATE,
-                status TEXT DEFAULT 'issued',
-                FOREIGN KEY (book_id) REFERENCES books(id),
-                FOREIGN KEY (customer_id) REFERENCES customers(id)
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='books' AND column_name='description'
+        ''')
+        if not cursor.fetchone():
+            cursor.execute('ALTER TABLE books ADD COLUMN description TEXT')
+        
+        cursor.execute('''
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='books' AND column_name='cover_image'
+        ''')
+        if not cursor.fetchone():
+            cursor.execute('ALTER TABLE books ADD COLUMN cover_image TEXT')
+        
+        # Exhibitions table (no dependencies)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS exhibitions (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR(500) NOT NULL,
+                description TEXT,
+                start_date DATE,
+                end_date DATE,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Users table (depends on customers)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role VARCHAR(50) DEFAULT 'user',
+                customer_id VARCHAR(50),
+                name VARCHAR(255)
+            )
+        ''')
+        
+        # Add foreign key constraint for users if it doesn't exist
+        cursor.execute('''
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name='users' 
+            AND constraint_type='FOREIGN KEY'
+            AND constraint_name LIKE '%customer_id%'
+        ''')
+        if not cursor.fetchone():
+            cursor.execute('''
+                ALTER TABLE users 
+                ADD CONSTRAINT fk_users_customer_id 
+                FOREIGN KEY (customer_id) REFERENCES customers(id)
+            ''')
+        
+        # Issues table (depends on books and customers)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS issues (
+                id SERIAL PRIMARY KEY,
+                book_id VARCHAR(50) NOT NULL,
+                book_title VARCHAR(500) NOT NULL,
+                customer_id VARCHAR(50) NOT NULL,
+                customer_name VARCHAR(255) NOT NULL,
+                date_issued DATE NOT NULL,
+                date_return DATE,
+                status VARCHAR(50) DEFAULT 'issued'
+            )
+        ''')
+        
+        # Add foreign key constraints for issues if they don't exist
+        cursor.execute('''
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name='issues' 
+            AND constraint_type='FOREIGN KEY'
+            AND constraint_name LIKE '%book_id%'
+        ''')
+        if not cursor.fetchone():
+            cursor.execute('''
+                ALTER TABLE issues 
+                ADD CONSTRAINT fk_issues_book_id 
+                FOREIGN KEY (book_id) REFERENCES books(id)
+            ''')
+        
+        cursor.execute('''
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name='issues' 
+            AND constraint_type='FOREIGN KEY'
+            AND constraint_name LIKE '%customer_id%'
+        ''')
+        if not cursor.fetchone():
+            cursor.execute('''
+                ALTER TABLE issues 
+                ADD CONSTRAINT fk_issues_customer_id 
+                FOREIGN KEY (customer_id) REFERENCES customers(id)
+            ''')
+        
+        # Exhibition books (depends on exhibitions and books)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS exhibition_books (
+                id SERIAL PRIMARY KEY,
+                exhibition_id INTEGER NOT NULL,
+                book_id VARCHAR(50) NOT NULL,
+                display_order INTEGER DEFAULT 0,
+                UNIQUE(exhibition_id, book_id)
+            )
+        ''')
+        
+        # Add foreign key constraints for exhibition_books if they don't exist
+        cursor.execute('''
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name='exhibition_books' 
+            AND constraint_type='FOREIGN KEY'
+            AND constraint_name LIKE '%exhibition_id%'
+        ''')
+        if not cursor.fetchone():
+            cursor.execute('''
+                ALTER TABLE exhibition_books 
+                ADD CONSTRAINT fk_exhibition_books_exhibition_id 
+                FOREIGN KEY (exhibition_id) REFERENCES exhibitions(id) ON DELETE CASCADE
+            ''')
+        
+        cursor.execute('''
+            SELECT constraint_name 
+            FROM information_schema.table_constraints 
+            WHERE table_name='exhibition_books' 
+            AND constraint_type='FOREIGN KEY'
+            AND constraint_name LIKE '%book_id%'
+        ''')
+        if not cursor.fetchone():
+            cursor.execute('''
+                ALTER TABLE exhibition_books 
+                ADD CONSTRAINT fk_exhibition_books_book_id 
+                FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+            ''')
         
         conn.commit()
 
@@ -92,17 +209,18 @@ def create_default_admin():
         cursor = conn.cursor()
         
         # Check if admin exists
-        cursor.execute("SELECT COUNT(*) FROM users WHERE role='admin'")
-        if cursor.fetchone()[0] == 0:
+        cursor.execute("SELECT COUNT(*) as count FROM users WHERE role='admin'")
+        result = cursor.fetchone()
+        if (result[0] if isinstance(result, tuple) else result['count']) == 0:
             # Create default admin
             from app.models.user import User
             password_hash = User.hash_password('admin123')  # Default password
             cursor.execute('''
                 INSERT INTO users (email, password_hash, role, name)
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
             ''', ('admin@library.com', password_hash, 'admin', 'Администратор'))
             conn.commit()
-            print("✓ Default admin created: admin@library.com / admin123")
+            print("[OK] Default admin created: admin@library.com / admin123")
 
 
 def import_sample_data():
@@ -111,8 +229,9 @@ def import_sample_data():
         cursor = conn.cursor()
         
         # Check if data already exists
-        cursor.execute('SELECT COUNT(*) FROM customers')
-        if cursor.fetchone()[0] > 0:
+        cursor.execute('SELECT COUNT(*) as count FROM customers')
+        result = cursor.fetchone()
+        if (result[0] if isinstance(result, tuple) else result['count']) > 0:
             return  # Data already imported
         
         # Import customers
@@ -122,8 +241,9 @@ def import_sample_data():
                 customers = json.load(f)
                 for customer in customers:
                     cursor.execute('''
-                        INSERT OR IGNORE INTO customers (id, name, address, zip, city, phone, email)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO customers (id, name, address, zip, city, phone, email)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (id) DO NOTHING
                     ''', (
                         customer['ID'],
                         customer['Name'],
@@ -150,8 +270,9 @@ def import_sample_data():
                 # Insert books
                 for book_id, book_title in books_dict.items():
                     cursor.execute('''
-                        INSERT OR IGNORE INTO books (id, title, author, isbn, category, total_copies, available_copies)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO books (id, title, author, isbn, category, total_copies, available_copies)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (id) DO NOTHING
                     ''', (book_id, book_title, '', '', '', 1, 1))
                 
                 # Insert issues
@@ -175,7 +296,7 @@ def import_sample_data():
                     
                     cursor.execute('''
                         INSERT INTO issues (book_id, book_title, customer_id, customer_name, date_issued, date_return, status)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ''', (
                         issue['Book ID'],
                         issue['Book'],
@@ -187,4 +308,3 @@ def import_sample_data():
                     ))
         
         conn.commit()
-

@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Управление выставками - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/admin/dashboard">Панель</a>
+<a href="/admin/customers">Читатели</a>
+<a href="/admin/books">Книги</a>
+<a href="/admin/issues">Выдачи</a>
+<a href="/admin/exhibitions">Выставки</a>
+<a href="/admin/reports">Отчеты</a>
+<span style="margin-left: auto; color: white;">👨‍💼 {{ user_name or 'Администратор' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="flex-between">
+            <h1 class="card-title">Управление выставками</h1>
+            <button class="btn btn-success" onclick="showAddExhibitionModal()">➕ Создать выставку</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Название</th>
+                        <th>Описание</th>
+                        <th>Период</th>
+                        <th>Книг</th>
+                        <th>Статус</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="exhibitions-table">
+                    <tr><td colspan="7" class="text-center">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Exhibition Modal -->
+<div id="exhibition-modal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <span class="modal-close" onclick="closeExhibitionModal()">&times;</span>
+            <h2 class="modal-title" id="exhibition-modal-title">Создать выставку</h2>
+        </div>
+        <form id="exhibition-form">
+            <input type="hidden" id="exhibition-id" />
+            <div class="form-group">
+                <label>Название *</label>
+                <input type="text" class="form-control" id="exhibition-title" required />
+            </div>
+            <div class="form-group">
+                <label>Описание</label>
+                <textarea class="form-control" id="exhibition-description" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Дата начала</label>
+                <input type="date" class="form-control" id="exhibition-start-date" />
+            </div>
+            <div class="form-group">
+                <label>Дата окончания</label>
+                <input type="date" class="form-control" id="exhibition-end-date" />
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="exhibition-is-active" checked />
+                    Активна
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeExhibitionModal()">Отмена</button>
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Manage Books Modal -->
+<div id="books-modal" class="modal">
+    <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header">
+            <span class="modal-close" onclick="closeBooksModal()">&times;</span>
+            <h2 class="modal-title" id="books-modal-title">Управление книгами выставки</h2>
+        </div>
+        <div style="margin-bottom: 1rem;">
+            <div class="search-bar">
+                <input type="text" class="form-control" id="book-search-input" placeholder="Поиск книги..." />
+                <button class="btn btn-primary" onclick="searchBooksForExhibition()">🔍 Поиск</button>
+            </div>
+        </div>
+        <div id="book-search-results" style="display: none; margin-bottom: 1rem;">
+            <h3>Результаты поиска:</h3>
+            <div id="book-search-list" class="book-list"></div>
+        </div>
+        <div>
+            <h3>Книги в выставке (перетащите для изменения порядка):</h3>
+            <div id="exhibition-books-list" class="book-list sortable-list"></div>
+            <p style="color: #666; font-size: 0.9rem; margin-top: 0.5rem;">
+                Рекомендуется: от 3 до 12 книг
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn" onclick="closeBooksModal()">Закрыть</button>
+            <button type="button" class="btn btn-primary" onclick="saveBookOrder()">Сохранить порядок</button>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div id="preview-modal" class="modal">
+    <div class="modal-content" style="max-width: 1200px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header">
+            <span class="modal-close" onclick="closePreviewModal()">&times;</span>
+            <h2 class="modal-title">Предпросмотр выставки</h2>
+        </div>
+        <div id="preview-content"></div>
+        <div class="modal-footer">
+            <button type="button" class="btn" onclick="closePreviewModal()">Закрыть</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/admin_exhibitions.js') }}"></script>
+{% endblock %}
+

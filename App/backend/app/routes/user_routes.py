@@ -70,3 +70,14 @@ def my_books():
                          customer_id=session.get('customer_id'),
                          user_name=session.get('user_name'))
 
+
+@user_bp.route('/profile')
+def profile():
+    """User profile page"""
+    redirect_response = require_user()
+    if redirect_response:
+        return redirect_response
+    return render_template('user/profile.html', 
+                         customer_id=session.get('customer_id'),
+                         user_name=session.get('user_name'))
+

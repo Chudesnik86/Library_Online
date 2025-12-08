@@ -38,15 +38,17 @@ class BookService:
         Returns: (success: bool, message: str)
         """
         # Validate required fields
-        if not book_data.get('id'):
-            return False, "Book ID is required"
         if not book_data.get('title'):
             return False, "Book title is required"
         
-        # Check if book already exists
-        existing = BookRepository.find_by_id(book_data['id'])
-        if existing:
-            return False, "Book with this ID already exists"
+        # Generate ID automatically if not provided
+        if not book_data.get('id'):
+            book_data['id'] = BookRepository.generate_unique_id()
+        else:
+            # Check if book already exists (only if ID was provided)
+            existing = BookRepository.find_by_id(book_data['id'])
+            if existing:
+                return False, "Book with this ID already exists"
         
         # Set default values
         if 'total_copies' not in book_data:
@@ -59,7 +61,7 @@ class BookService:
         success = BookRepository.create(book)
         
         if success:
-            return True, "Book created successfully"
+            return True, f"Book created successfully with ID: {book_data['id']}"
         return False, "Failed to create book"
     
     @staticmethod
@@ -97,6 +99,10 @@ class BookService:
             return False, "Book not found"
         
         # TODO: Check if book has active issues
+        
+        # Remove book from all exhibitions (cascade handled by DB, but explicit for clarity)
+        from app.repositories import ExhibitionRepository
+        ExhibitionRepository.remove_books_from_exhibitions(book_id)
         
         success = BookRepository.delete(book_id)
         

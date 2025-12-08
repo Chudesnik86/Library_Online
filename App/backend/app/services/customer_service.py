@@ -33,22 +33,24 @@ class CustomerService:
         Returns: (success: bool, message: str)
         """
         # Validate required fields
-        if not customer_data.get('id'):
-            return False, "Customer ID is required"
         if not customer_data.get('name'):
             return False, "Customer name is required"
         
-        # Check if customer already exists
-        existing = CustomerRepository.find_by_id(customer_data['id'])
-        if existing:
-            return False, "Customer with this ID already exists"
+        # Generate ID automatically if not provided
+        if not customer_data.get('id'):
+            customer_data['id'] = CustomerRepository.generate_unique_id()
+        else:
+            # Check if customer already exists (only if ID was provided)
+            existing = CustomerRepository.find_by_id(customer_data['id'])
+            if existing:
+                return False, "Customer with this ID already exists"
         
         # Create customer
         customer = Customer.from_dict(customer_data)
         success = CustomerRepository.create(customer)
         
         if success:
-            return True, "Customer created successfully"
+            return True, f"Customer created successfully with ID: {customer_data['id']}"
         return False, "Failed to create customer"
     
     @staticmethod

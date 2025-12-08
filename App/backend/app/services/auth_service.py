@@ -104,6 +104,88 @@ class AuthService:
             customer_id=user.customer_id,
             name=user.name
         )
+    
+    @staticmethod
+    def get_user_profile(user_id: int) -> Tuple[bool, Optional[dict], str]:
+        """
+        Get user profile with customer data
+        Returns: (success: bool, profile_data: dict, message: str)
+        """
+        user = UserRepository.find_by_id(user_id)
+        if not user:
+            return False, None, "Пользователь не найден"
+        
+        profile = user.to_dict()
+        
+        # Get customer data if exists
+        if user.customer_id:
+            customer = CustomerRepository.find_by_id(user.customer_id)
+            if customer:
+                profile['customer'] = customer.to_dict()
+        
+        return True, profile, "Профиль получен"
+    
+    @staticmethod
+    def update_user_profile(user_id: int, profile_data: dict) -> Tuple[bool, str]:
+        """
+        Update user profile
+        Returns: (success: bool, message: str)
+        """
+        user = UserRepository.find_by_id(user_id)
+        if not user:
+            return False, "Пользователь не найден"
+        
+        # Update user name
+        if 'name' in profile_data:
+            user.name = profile_data['name']
+        
+        # Update email if provided and not taken by another user
+        if 'email' in profile_data and profile_data['email'] != user.email:
+            new_email = profile_data['email']
+            if UserRepository.email_exists_for_other_user(new_email, user_id):
+                return False, "Этот email уже используется другим пользователем"
+            user.email = new_email
+        
+        # Update password if provided
+        if 'password' in profile_data and profile_data['password']:
+            if 'current_password' not in profile_data:
+                return False, "Требуется текущий пароль для изменения пароля"
+            
+            # Verify current password
+            if not user.check_password(profile_data['current_password']):
+                return False, "Неверный текущий пароль"
+            
+            if len(profile_data['password']) < 6:
+                return False, "Пароль должен быть минимум 6 символов"
+            
+            user.password_hash = User.hash_password(profile_data['password'])
+        
+        # Update user in database
+        if not UserRepository.update(user):
+            return False, "Ошибка обновления профиля"
+        
+        # Update customer data if exists
+        if user.customer_id and 'customer' in profile_data:
+            customer = CustomerRepository.find_by_id(user.customer_id)
+            if customer:
+                customer_data = profile_data['customer']
+                if 'name' in customer_data:
+                    customer.name = customer_data['name']
+                if 'address' in customer_data:
+                    customer.address = customer_data.get('address')
+                if 'zip' in customer_data:
+                    customer.zip = customer_data.get('zip')
+                if 'city' in customer_data:
+                    customer.city = customer_data.get('city')
+                if 'phone' in customer_data:
+                    customer.phone = customer_data.get('phone')
+                if 'email' in customer_data:
+                    customer.email = customer_data.get('email')
+                
+                if not CustomerRepository.update(customer):
+                    return False, "Ошибка обновления данных читателя"
+        
+        return True, "Профиль успешно обновлен"
 
 
 

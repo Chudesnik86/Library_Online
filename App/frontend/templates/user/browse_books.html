@@ -6,6 +6,7 @@
 <a href="/user/dashboard">Главная</a>
 <a href="/user/browse_books">Книги</a>
 <a href="/user/my_books">Мои книги</a>
+<a href="/user/profile">Профиль</a>
 <span style="margin-left: auto; color: white;">📖 {{ user_name or 'Читатель' }}</span>
 <a href="/auth/logout">Выход</a>
 {% endblock %}
@@ -38,6 +39,47 @@
         </div>
     </div>
 </div>
+
+<!-- Book Details Modal -->
+<div id="book-details-modal" class="modal">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <span class="modal-close" onclick="closeBookDetailsModal()">&times;</span>
+            <h2 class="modal-title" id="book-details-title">Детали книги</h2>
+        </div>
+        <div style="padding: 1.5rem 0;">
+            <div style="display: grid; grid-template-columns: 200px 1fr; gap: 2rem; align-items: start;">
+                <div>
+                    <img id="book-details-cover" src="" alt="Обложка книги" 
+                         style="width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+                                background: #F3F4F6; min-height: 280px; object-fit: cover; display: block;" 
+                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'280\'%3E%3Crect fill=\'%23E5E7EB\' width=\'200\' height=\'280\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' fill=\'%239CA3AF\' font-size=\'14\'%3EНет обложки%3C/text%3E%3C/svg%3E';" />
+                </div>
+                <div>
+                    <h3 id="book-details-title-text" style="margin-top: 0; color: var(--primary-color); font-size: 1.5rem;"></h3>
+                    <div style="margin-bottom: 1rem;">
+                        <p style="margin: 0.5rem 0;"><strong>Автор:</strong> <span id="book-details-author">-</span></p>
+                        <p style="margin: 0.5rem 0;"><strong>ISBN:</strong> <span id="book-details-isbn">-</span></p>
+                        <p style="margin: 0.5rem 0;"><strong>Категория:</strong> <span id="book-details-category">-</span></p>
+                        <p style="margin: 0.5rem 0;"><strong>Доступно:</strong> <span id="book-details-available"></span> из <span id="book-details-total"></span></p>
+                    </div>
+                    <div style="margin-top: 1.5rem;">
+                        <h4 style="margin-bottom: 0.5rem; color: var(--primary-color);">Описание:</h4>
+                        <p id="book-details-description" style="line-height: 1.6; color: var(--dark-text); white-space: pre-wrap;">
+                            Описание отсутствует
+                        </p>
+                    </div>
+                    <div style="margin-top: 1.5rem;" id="book-details-actions">
+                        <!-- Action buttons will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn" onclick="closeBookDetailsModal()">Закрыть</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -63,7 +105,12 @@
 
         tbody.innerHTML = books.map(book => `
             <tr>
-                <td><strong>${book.title}</strong></td>
+                <td>
+                    <a href="#" onclick="showBookDetails(${JSON.stringify(book).replace(/"/g, '&quot;')}); return false;" 
+                       style="color: var(--primary-color); text-decoration: none; font-weight: 600; cursor: pointer;">
+                       <strong>${book.title}</strong>
+                    </a>
+                </td>
                 <td>${book.author || 'Не указан'}</td>
                 <td>${book.category || 'Не указана'}</td>
                 <td>${book.available_copies} из ${book.total_copies}</td>
@@ -88,7 +135,8 @@
     }
 
     async function borrowBook(bookId) {
-        if (!confirm('Вы хотите взять эту книгу?')) return;
+        const confirmed = await confirmAction('Вы хотите взять эту книгу?', 'Взять книгу');
+        if (!confirmed) return;
 
         try {
             await apiCall('/api/issues', {
@@ -103,6 +151,55 @@
         } catch (error) {
             showAlert('Ошибка: ' + error.message, 'danger');
         }
+    }
+
+    // Show book details modal
+    function showBookDetails(book) {
+        document.getElementById('book-details-title-text').textContent = book.title;
+        document.getElementById('book-details-author').textContent = book.author || 'Не указан';
+        document.getElementById('book-details-isbn').textContent = book.isbn || 'Не указан';
+        document.getElementById('book-details-category').textContent = book.category || 'Не указана';
+        document.getElementById('book-details-available').textContent = book.available_copies;
+        document.getElementById('book-details-total').textContent = book.total_copies;
+        document.getElementById('book-details-description').textContent = book.description || 'Описание отсутствует';
+        
+        const coverImg = document.getElementById('book-details-cover');
+        if (book.cover_image) {
+            coverImg.src = book.cover_image;
+        } else {
+            coverImg.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'280\'%3E%3Crect fill=\'%23E5E7EB\' width=\'200\' height=\'280\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' fill=\'%239CA3AF\' font-size=\'14\'%3EНет обложки%3C/text%3E%3C/svg%3E';
+        }
+        
+        // Add action button
+        const actionsDiv = document.getElementById('book-details-actions');
+        if (book.available_copies > 0) {
+            actionsDiv.innerHTML = `<button class="btn btn-success" onclick="borrowBookFromModal('${book.id}')">Взять книгу</button>`;
+        } else {
+            actionsDiv.innerHTML = '<span style="color: var(--danger-color);">Книга недоступна</span>';
+        }
+        
+        document.getElementById('book-details-modal').classList.add('active');
+    }
+
+    function closeBookDetailsModal() {
+        document.getElementById('book-details-modal').classList.remove('active');
+    }
+
+    // Close book details modal on background click
+    document.addEventListener('DOMContentLoaded', function() {
+        const bookDetailsModal = document.getElementById('book-details-modal');
+        if (bookDetailsModal) {
+            bookDetailsModal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeBookDetailsModal();
+                }
+            });
+        }
+    });
+
+    async function borrowBookFromModal(bookId) {
+        closeBookDetailsModal();
+        await borrowBook(bookId);
     }
 
     document.addEventListener('DOMContentLoaded', loadBooks);

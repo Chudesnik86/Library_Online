@@ -79,3 +79,12 @@ def reports():
         return redirect_response
     return render_template('admin/reports.html', user_name=session.get('user_name'))
 
+
+@admin_bp.route('/exhibitions')
+def exhibitions():
+    """Manage exhibitions"""
+    redirect_response = require_admin()
+    if redirect_response:
+        return redirect_response
+    return render_template('admin/exhibitions.html', user_name=session.get('user_name'))
+

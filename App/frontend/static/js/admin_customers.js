@@ -48,15 +48,14 @@ function showAddModal() {
     isEditMode = false;
     document.getElementById('modal-title').textContent = 'Добавить читателя';
     document.getElementById('customer-form').reset();
-    document.getElementById('customer-id').readOnly = false;
     document.getElementById('modal').classList.add('active');
 }
 
 function edit(customer) {
     isEditMode = true;
     document.getElementById('modal-title').textContent = 'Редактировать читателя';
-    document.getElementById('customer-id').value = customer.id;
-    document.getElementById('customer-id').readOnly = true;
+    // Store customer ID in a hidden field or data attribute
+    document.getElementById('customer-form').dataset.customerId = customer.id;
     document.getElementById('customer-name').value = customer.name;
     document.getElementById('customer-address').value = customer.address || '';
     document.getElementById('customer-zip').value = customer.zip || '';
@@ -74,7 +73,6 @@ document.getElementById('customer-form').addEventListener('submit', async (e) =>
     e.preventDefault();
 
     const data = {
-        id: document.getElementById('customer-id').value,
         name: document.getElementById('customer-name').value,
         address: document.getElementById('customer-address').value,
         zip: parseInt(document.getElementById('customer-zip').value) || null,
@@ -85,12 +83,15 @@ document.getElementById('customer-form').addEventListener('submit', async (e) =>
 
     try {
         if (isEditMode) {
+            // Include ID for editing
+            data.id = document.getElementById('customer-form').dataset.customerId;
             await apiCall(`/api/customers/${data.id}`, {
                 method: 'PUT',
                 body: JSON.stringify(data)
             });
             showAlert('Читатель обновлен!', 'success');
         } else {
+            // Don't send ID for new customers - it will be generated automatically
             await apiCall('/api/customers', {
                 method: 'POST',
                 body: JSON.stringify(data)
@@ -105,7 +106,8 @@ document.getElementById('customer-form').addEventListener('submit', async (e) =>
 });
 
 async function deleteCustomer(id) {
-    if (!confirm('Удалить читателя?')) return;
+    const confirmed = await confirmAction('Вы уверены, что хотите удалить этого читателя?', 'Удаление читателя');
+    if (!confirmed) return;
 
     try {
         await apiCall(`/api/customers/${id}`, { method: 'DELETE' });

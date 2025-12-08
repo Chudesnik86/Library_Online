@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Личный кабинет - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/user/dashboard">Главная</a>
+<a href="/user/browse_books">Книги</a>
+<a href="/user/my_books">Мои книги</a>
+<a href="/user/profile">Профиль</a>
+<span style="margin-left: auto; color: white;">📖 {{ user_name or 'Читатель' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <h1 class="card-title">Личный кабинет</h1>
+        <p style="color: var(--light-text); margin-bottom: 2rem;">Управление вашими личными данными</p>
+
+        <!-- Profile Form -->
+        <form id="profile-form">
+            <div style="display: grid; gap: 1.5rem;">
+                <h2 style="font-size: 1.25rem; color: var(--primary-color); margin-bottom: 0.5rem;">Основная информация</h2>
+                
+                <div class="form-group">
+                    <label>Имя *</label>
+                    <input type="text" class="form-control" id="profile-name" required />
+                </div>
+
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" class="form-control" id="profile-email" required />
+                </div>
+
+                <div class="form-group">
+                    <label>ID читателя</label>
+                    <input type="text" class="form-control" id="profile-customer-id" readonly style="background-color: #F3F4F6;" />
+                </div>
+
+                <h2 style="font-size: 1.25rem; color: var(--primary-color); margin-top: 1rem; margin-bottom: 0.5rem;">Контактная информация</h2>
+
+                <div class="form-group">
+                    <label>Адрес</label>
+                    <input type="text" class="form-control" id="profile-address" />
+                </div>
+
+                <div class="form-group">
+                    <label>Почтовый индекс</label>
+                    <input type="number" class="form-control" id="profile-zip" />
+                </div>
+
+                <div class="form-group">
+                    <label>Город</label>
+                    <input type="text" class="form-control" id="profile-city" />
+                </div>
+
+                <div class="form-group">
+                    <label>Телефон</label>
+                    <input type="tel" class="form-control" id="profile-phone" />
+                </div>
+
+                <h2 style="font-size: 1.25rem; color: var(--primary-color); margin-top: 1rem; margin-bottom: 0.5rem;">Смена пароля</h2>
+                <p style="font-size: 0.9rem; color: var(--light-text); margin-bottom: 1rem;">
+                    Оставьте поля пароля пустыми, если не хотите менять пароль
+                </p>
+
+                <div class="form-group">
+                    <label>Текущий пароль</label>
+                    <input type="password" class="form-control" id="profile-current-password" />
+                </div>
+
+                <div class="form-group">
+                    <label>Новый пароль</label>
+                    <input type="password" class="form-control" id="profile-new-password" />
+                </div>
+
+                <div class="form-group">
+                    <label>Подтвердите новый пароль</label>
+                    <input type="password" class="form-control" id="profile-confirm-password" />
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                <button type="button" class="btn" onclick="loadProfile()" style="background-color: #E5E7EB; color: var(--dark-text);">Отмена</button>
+                <button type="submit" class="btn btn-success">Сохранить изменения</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    // Load profile data
+    async function loadProfile() {
+        try {
+            const profile = await apiCall('/api/profile');
+            
+            // Fill form fields
+            document.getElementById('profile-name').value = profile.name || '';
+            document.getElementById('profile-email').value = profile.email || '';
+            document.getElementById('profile-customer-id').value = profile.customer_id || '';
+            
+            if (profile.customer) {
+                document.getElementById('profile-address').value = profile.customer.address || '';
+                document.getElementById('profile-zip').value = profile.customer.zip || '';
+                document.getElementById('profile-city').value = profile.customer.city || '';
+                document.getElementById('profile-phone').value = profile.customer.phone || '';
+            }
+            
+            // Clear password fields
+            document.getElementById('profile-current-password').value = '';
+            document.getElementById('profile-new-password').value = '';
+            document.getElementById('profile-confirm-password').value = '';
+        } catch (error) {
+            showAlert('Ошибка загрузки профиля: ' + error.message, 'danger');
+        }
+    }
+
+    // Handle form submission
+    document.getElementById('profile-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById('profile-name').value;
+        const email = document.getElementById('profile-email').value;
+        const currentPassword = document.getElementById('profile-current-password').value;
+        const newPassword = document.getElementById('profile-new-password').value;
+        const confirmPassword = document.getElementById('profile-confirm-password').value;
+
+        // Validate passwords if provided
+        if (newPassword || currentPassword) {
+            if (!currentPassword) {
+                showAlert('Для смены пароля необходимо указать текущий пароль', 'danger');
+                return;
+            }
+            if (newPassword.length < 6) {
+                showAlert('Новый пароль должен быть минимум 6 символов', 'danger');
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                showAlert('Новые пароли не совпадают', 'danger');
+                return;
+            }
+        }
+
+        const profileData = {
+            name: name,
+            email: email,
+            customer: {
+                address: document.getElementById('profile-address').value || null,
+                zip: document.getElementById('profile-zip').value ? parseInt(document.getElementById('profile-zip').value) : null,
+                city: document.getElementById('profile-city').value || null,
+                phone: document.getElementById('profile-phone').value || null
+            }
+        };
+
+        // Add password fields if provided
+        if (newPassword) {
+            profileData.password = newPassword;
+            profileData.current_password = currentPassword;
+        }
+
+        try {
+            const result = await apiCall('/api/profile', {
+                method: 'PUT',
+                body: JSON.stringify(profileData)
+            });
+
+            if (result.success) {
+                showAlert('Профиль успешно обновлен!', 'success');
+                
+                // Update JWT token if new one provided
+                if (result.token) {
+                    localStorage.setItem('jwt_token', result.token);
+                }
+                
+                // Clear password fields
+                document.getElementById('profile-current-password').value = '';
+                document.getElementById('profile-new-password').value = '';
+                document.getElementById('profile-confirm-password').value = '';
+                
+                // If password was changed, suggest logout
+                if (newPassword) {
+                    setTimeout(async () => {
+                        const confirmed = await confirmAction(
+                            'Пароль изменен. Рекомендуется выйти и войти заново. Выйти сейчас?',
+                            'Смена пароля'
+                        );
+                        if (confirmed) {
+                            window.location.href = '/auth/logout';
+                        }
+                    }, 1000);
+                }
+            }
+        } catch (error) {
+            showAlert('Ошибка обновления профиля: ' + error.message, 'danger');
+        }
+    });
+
+    // Load profile on page load
+    document.addEventListener('DOMContentLoaded', loadProfile);
+</script>
+{% endblock %}
+
