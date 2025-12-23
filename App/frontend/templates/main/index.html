@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Главная - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/">Главная</a>
+<a href="/user/browse_books">Книги</a>
+<a href="/user/exhibitions">Выставки</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card" style="text-align: center; padding: 3rem;">
+        <h1 class="card-title" style="font-size: 2.5rem; margin-bottom: 1rem;">📚 Library Online</h1>
+        <p style="font-size: 1.2rem; color: var(--dark-text); margin-bottom: 2rem;">
+            Добро пожаловать в онлайн-библиотеку!
+        </p>
+        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+            <a href="/user/browse_books" class="btn btn-primary" style="font-size: 1.1rem; padding: 1rem 2rem;">
+                📖 Просмотреть каталог книг
+            </a>
+            <a href="/user/exhibitions" class="btn btn-primary" style="font-size: 1.1rem; padding: 1rem 2rem;">
+                📚 Посмотреть выставки
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-3" style="margin-top: 2rem;">
+        <div class="card">
+            <h2 style="color: var(--primary-color); margin-bottom: 1rem;">🔍 Поиск книг</h2>
+            <p>Ищите книги по названию, автору или теме. Используйте расширенный поиск для точных результатов.</p>
+        </div>
+        <div class="card">
+            <h2 style="color: var(--primary-color); margin-bottom: 1rem;">📚 Каталог</h2>
+            <p>Просматривайте полный каталог книг с подробной информацией, обложками и биографиями авторов.</p>
+        </div>
+        <div class="card">
+            <h2 style="color: var(--primary-color); margin-bottom: 1rem;">👤 Администратор</h2>
+            <p>Для выдачи книг обратитесь к администратору библиотеки. Только администратор может выдавать книги.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

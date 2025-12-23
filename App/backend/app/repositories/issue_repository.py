@@ -34,6 +34,19 @@ class IssueRepository:
             return [Issue.from_dict(dict(row)) for row in rows]
     
     @staticmethod
+    def find_returned() -> List[Issue]:
+        """Get all returned issues"""
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT * FROM issues
+                WHERE status = 'returned'
+                ORDER BY date_return DESC
+            ''')
+            rows = cursor.fetchall()
+            return [Issue.from_dict(dict(row)) for row in rows]
+    
+    @staticmethod
     def find_by_customer(customer_id: str) -> List[Issue]:
         """Find all issues for a specific customer"""
         with get_db_connection() as conn:
@@ -97,7 +110,11 @@ class IssueRepository:
     def return_book(issue_id: int, return_date: str = None) -> bool:
         """Mark an issue as returned"""
         if return_date is None:
-            return_date = datetime.now().strftime('%Y-%m-%d')
+            from config import SYSTEM_DATE, USE_SYSTEM_DATE
+            if USE_SYSTEM_DATE:
+                return_date = SYSTEM_DATE
+            else:
+                return_date = datetime.now().strftime('%Y-%m-%d')
         
         try:
             with get_db_connection() as conn:
@@ -129,18 +146,38 @@ class IssueRepository:
     
     @staticmethod
     def get_overdue() -> List[Issue]:
-        """Get all overdue issues (more than LOAN_PERIOD_DAYS days old)"""
-        from config import LOAN_PERIOD_DAYS
+        """Get all overdue issues (more than LOAN_PERIOD_DAYS days old, + 7 days if extended)"""
+        from config import LOAN_PERIOD_DAYS, SYSTEM_DATE, USE_SYSTEM_DATE
+        
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
-            # Calculate the cutoff date (LOAN_PERIOD_DAYS ago)
-            # PostgreSQL uses INTERVAL '14 days' syntax
-            cursor.execute(f'''
-                SELECT * FROM issues
-                WHERE status = 'issued'
-                AND date_issued < CURRENT_DATE - INTERVAL '{LOAN_PERIOD_DAYS} days'
-                ORDER BY date_issued ASC
-            ''')
+            # Use system date if configured, otherwise use CURRENT_DATE
+            # For extended issues, add 7 more days
+            if USE_SYSTEM_DATE:
+                # Use system date for comparison
+                # Calculate: date_issued + LOAN_PERIOD_DAYS + (7 if extended else 0) < SYSTEM_DATE
+                cursor.execute(f'''
+                    SELECT * FROM issues
+                    WHERE status = 'issued'
+                    AND (
+                        (extended = FALSE AND date_issued < DATE '{SYSTEM_DATE}' - INTERVAL '{LOAN_PERIOD_DAYS} days')
+                        OR
+                        (extended = TRUE AND date_issued < DATE '{SYSTEM_DATE}' - INTERVAL '{LOAN_PERIOD_DAYS + 7} days')
+                    )
+                    ORDER BY date_issued ASC
+                ''')
+            else:
+                # Use actual current date
+                cursor.execute(f'''
+                    SELECT * FROM issues
+                    WHERE status = 'issued'
+                    AND (
+                        (extended = FALSE AND date_issued < CURRENT_DATE - INTERVAL '{LOAN_PERIOD_DAYS} days')
+                        OR
+                        (extended = TRUE AND date_issued < CURRENT_DATE - INTERVAL '{LOAN_PERIOD_DAYS + 7} days')
+                    )
+                    ORDER BY date_issued ASC
+                ''')
             rows = cursor.fetchall()
             return [Issue.from_dict(dict(row)) for row in rows]
     
@@ -162,13 +199,28 @@ class IssueRepository:
             result = cursor.fetchone()
             stats['active_issues'] = result['count'] if result else 0
             
-            # Overdue issues (using SQL for accuracy)
-            from config import LOAN_PERIOD_DAYS
-            cursor.execute(f'''
-                SELECT COUNT(*) as count FROM issues
-                WHERE status = 'issued'
-                AND date_issued < CURRENT_DATE - INTERVAL '{LOAN_PERIOD_DAYS} days'
-            ''')
+            # Overdue issues (using SQL for accuracy, accounting for extensions)
+            from config import LOAN_PERIOD_DAYS, SYSTEM_DATE, USE_SYSTEM_DATE
+            if USE_SYSTEM_DATE:
+                cursor.execute(f'''
+                    SELECT COUNT(*) as count FROM issues
+                    WHERE status = 'issued'
+                    AND (
+                        (extended = FALSE AND date_issued < DATE '{SYSTEM_DATE}' - INTERVAL '{LOAN_PERIOD_DAYS} days')
+                        OR
+                        (extended = TRUE AND date_issued < DATE '{SYSTEM_DATE}' - INTERVAL '{LOAN_PERIOD_DAYS + 7} days')
+                    )
+                ''')
+            else:
+                cursor.execute(f'''
+                    SELECT COUNT(*) as count FROM issues
+                    WHERE status = 'issued'
+                    AND (
+                        (extended = FALSE AND date_issued < CURRENT_DATE - INTERVAL '{LOAN_PERIOD_DAYS} days')
+                        OR
+                        (extended = TRUE AND date_issued < CURRENT_DATE - INTERVAL '{LOAN_PERIOD_DAYS + 7} days')
+                    )
+                ''')
             result = cursor.fetchone()
             stats['overdue_issues'] = result['count'] if result else 0
             
@@ -193,5 +245,53 @@ class IssueRepository:
             stats['top_books'] = [dict(row) for row in cursor.fetchall()]
             
             return stats
+    
+    @staticmethod
+    def extend_issue(issue_id: int) -> tuple[bool, str]:
+        """
+        Extend an issue by 7 days (one week)
+        Returns: (success: bool, message: str)
+        """
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+                
+                # Get current issue
+                cursor.execute('SELECT * FROM issues WHERE id = %s', (issue_id,))
+                issue = cursor.fetchone()
+                
+                if not issue:
+                    return False, "Выдача не найдена"
+                
+                if issue['status'] != 'issued':
+                    return False, "Можно продлить только активную выдачу"
+                
+                if issue.get('extended', False):
+                    return False, "Выдача уже была продлена. Продление возможно только один раз"
+                
+                # Mark as extended
+                cursor.execute('''
+                    UPDATE issues
+                    SET extended = TRUE
+                    WHERE id = %s
+                ''', (issue_id,))
+                
+                conn.commit()
+                return True, "Выдача успешно продлена на 7 дней"
+        except Exception as e:
+            print(f"Error extending issue: {e}")
+            return False, f"Ошибка при продлении: {str(e)}"
+    
+    @staticmethod
+    def delete(issue_id: int) -> bool:
+        """Delete an issue"""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM issues WHERE id = %s', (issue_id,))
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error deleting issue: {e}")
+            return False
 
 

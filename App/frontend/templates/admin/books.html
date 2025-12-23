@@ -6,6 +6,7 @@
 <a href="/admin/dashboard">Панель</a>
 <a href="/admin/customers">Читатели</a>
 <a href="/admin/books">Книги</a>
+<a href="/admin/authors">Авторы</a>
 <a href="/admin/issues">Выдачи</a>
 <a href="/admin/exhibitions">Выставки</a>
 <a href="/admin/reports">Отчеты</a>
@@ -48,6 +49,35 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination -->
+        <div id="pagination-container" style="display: none; margin-top: 1.5rem; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                <div style="color: var(--dark-text);">
+                    Показано <span id="pagination-info-start">0</span> - <span id="pagination-info-end">0</span> из <span id="pagination-info-total">0</span> книг
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <label style="color: var(--dark-text); font-size: 0.9rem;">Книг на странице:</label>
+                    <select id="pagination-per-page" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;" onchange="changePerPage(parseInt(this.value))">
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                        <option value="50" selected>50</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <button id="pagination-prev" class="btn" onclick="changePage(currentPage - 1)" disabled>← Предыдущая</button>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="color: var(--dark-text);">Страница</span>
+                    <input type="number" id="pagination-page-input" min="1" value="1" 
+                           style="width: 60px; padding: 0.25rem 0.5rem; border: 1px solid #ddd; border-radius: 4px; text-align: center;"
+                           onchange="goToPage(parseInt(this.value))" />
+                    <span style="color: var(--dark-text);">из <span id="pagination-total-pages">1</span></span>
+                </div>
+                <button id="pagination-next" class="btn" onclick="changePage(currentPage + 1)" disabled>Следующая →</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -65,8 +95,25 @@
                 <input type="text" class="form-control" id="book-title" required />
             </div>
             <div class="form-group">
-                <label>Автор</label>
-                <input type="text" class="form-control" id="book-author" />
+                <label>Авторы *</label>
+                <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.5rem; min-height: 100px; max-height: 200px; overflow-y: auto; background: white;" id="authors-container">
+                    <div style="color: var(--light-text); font-size: 0.9rem; margin-bottom: 0.5rem;">Выберите авторов из списка или введите имя нового автора</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;" id="selected-authors">
+                        <!-- Selected authors will be displayed here -->
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <select class="form-control" id="author-select" style="margin-bottom: 0.5rem;" onchange="addAuthorFromSelect()">
+                            <option value="">Выберите автора...</option>
+                        </select>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" class="form-control" id="new-author-input" placeholder="Или введите имя нового автора..." style="flex: 1;" />
+                            <button type="button" class="btn btn-primary" onclick="addNewAuthor()">Добавить</button>
+                        </div>
+                    </div>
+                </div>
+                <small style="color: var(--light-text); font-size: 0.85rem; display: block; margin-top: 0.25rem;">
+                    💡 Можно выбрать несколько авторов. Авторы будут отображаться через запятую.
+                </small>
             </div>
             <div class="form-group">
                 <label>ISBN</label>
@@ -93,9 +140,22 @@
                 <textarea class="form-control" id="book-description" rows="4" placeholder="Введите описание книги..."></textarea>
             </div>
             <div class="form-group">
-                <label>URL обложки</label>
-                <input type="url" class="form-control" id="book-cover-image" placeholder="https://example.com/book-cover.jpg" />
-                <small style="color: var(--light-text); font-size: 0.85rem;">Ссылка на изображение обложки книги</small>
+                <label>Обложки</label>
+                <div style="border: 1px solid #ddd; border-radius: 5px; padding: 0.5rem; min-height: 100px; max-height: 300px; overflow-y: auto; background: white;" id="covers-container">
+                    <div style="color: var(--light-text); font-size: 0.9rem; margin-bottom: 0.5rem;">Добавьте ссылки на обложки книги</div>
+                    <div id="selected-covers">
+                        <!-- Selected covers will be displayed here -->
+                    </div>
+                    <div style="margin-top: 0.5rem;">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="url" class="form-control" id="new-cover-input" placeholder="URL обложки (https://...)" style="flex: 1;" />
+                            <button type="button" class="btn btn-primary" onclick="addCover()">Добавить</button>
+                        </div>
+                    </div>
+                </div>
+                <small style="color: var(--light-text); font-size: 0.85rem; display: block; margin-top: 0.25rem;">
+                    💡 Можно добавить несколько обложек. Пользователи смогут переключаться между ними.
+                </small>
             </div>
             <div class="form-group">
                 <label>Всего экземпляров</label>

@@ -22,6 +22,11 @@ class IssueService:
         return IssueRepository.find_active()
     
     @staticmethod
+    def get_returned_issues() -> List[Issue]:
+        """Get all returned issues"""
+        return IssueRepository.find_returned()
+    
+    @staticmethod
     def get_customer_issues(customer_id: str) -> List[Issue]:
         """Get all issues for a customer"""
         return IssueRepository.find_by_customer(customer_id)
@@ -115,6 +120,27 @@ class IssueService:
         return IssueRepository.get_overdue()
     
     @staticmethod
+    def extend_issue(issue_id: int) -> tuple[bool, str]:
+        """
+        Extend an issue by 7 days (one week)
+        Returns: (success: bool, message: str)
+        """
+        # Check if issue exists and is active
+        issue = IssueRepository.find_by_id(issue_id)
+        if not issue:
+            return False, "Выдача не найдена"
+        
+        if issue.status != 'issued':
+            return False, "Можно продлить только активную выдачу"
+        
+        if issue.extended:
+            return False, "Выдача уже была продлена. Продление возможно только один раз"
+        
+        # Extend the issue
+        success, message = IssueRepository.extend_issue(issue_id)
+        return success, message
+    
+    @staticmethod
     def get_statistics() -> dict:
         """Get statistics about issues"""
         stats = IssueRepository.get_statistics()
@@ -124,8 +150,8 @@ class IssueService:
         stats['total_customers'] = len(customers)
         
         # Add book count
-        books = BookRepository.find_all()
-        stats['total_books'] = len(books)
+        books, total_books_count = BookRepository.find_all()
+        stats['total_books'] = total_books_count
         stats['available_books'] = len([b for b in books if b.is_available])
         
         # Overdue count is already calculated in IssueRepository.get_statistics()
@@ -149,19 +175,100 @@ class IssueService:
     @staticmethod
     def generate_overdue_report() -> List[dict]:
         """Generate overdue books report"""
+        from datetime import datetime, timedelta
+        from config import LOAN_PERIOD_DAYS, SYSTEM_DATE, USE_SYSTEM_DATE
+        
         overdue_issues = IssueService.get_overdue_issues()
         
         report = []
         for issue in overdue_issues:
+            # Calculate return date (date_issued + LOAN_PERIOD_DAYS)
+            try:
+                if isinstance(issue.date_issued, str):
+                    issued_date = datetime.strptime(issue.date_issued, '%Y-%m-%d')
+                else:
+                    issued_date = datetime.combine(issue.date_issued, datetime.min.time())
+                
+                return_date = issued_date + timedelta(days=LOAN_PERIOD_DAYS)
+                return_date_str = return_date.strftime('%Y-%m-%d')
+            except:
+                return_date_str = 'Не указана'
+            
             report.append({
                 'issue_id': issue.id,
                 'book_title': issue.book_title,
                 'customer_name': issue.customer_name,
                 'date_issued': issue.date_issued,
+                'return_date': return_date_str,  # New column: "Вернуть до"
                 'days_borrowed': issue.days_borrowed,
                 'days_overdue': issue.days_borrowed - LOAN_PERIOD_DAYS
             })
         
         return report
+    
+    @staticmethod
+    def create_issue_from_import(issue_data: dict) -> tuple[bool, str]:
+        """
+        Create an issue from imported data (for Excel import)
+        Returns: (success: bool, message: str)
+        """
+        # Validate required fields
+        if not issue_data.get('book_id'):
+            return False, "Book ID is required"
+        if not issue_data.get('customer_id'):
+            return False, "Customer ID is required"
+        if not issue_data.get('date_issued'):
+            return False, "Date of issue is required"
+        
+        # Validate book exists
+        book = BookRepository.find_by_id(issue_data['book_id'])
+        if not book:
+            return False, f"Book with ID '{issue_data['book_id']}' not found"
+        
+        # Use book title from database if not provided in import
+        book_title = issue_data.get('book_title') or book.title
+        
+        # Validate customer exists
+        customer = CustomerRepository.find_by_id(issue_data['customer_id'])
+        if not customer:
+            return False, f"Customer with ID '{issue_data['customer_id']}' not found"
+        
+        # Use customer name from database if not provided in import
+        customer_name = issue_data.get('customer_name') or customer.name
+        
+        # Determine status
+        status = issue_data.get('status', 'issued')
+        date_return = issue_data.get('date_return')
+        
+        # If status is 'issued', check if book is available
+        if status == 'issued':
+            # Check if book has available copies
+            if book.available_copies <= 0:
+                return False, f"Book '{book_title}' is not available (no copies left)"
+        
+        # Create issue
+        issue = Issue(
+            id=None,
+            book_id=issue_data['book_id'],
+            book_title=book_title,
+            customer_id=issue_data['customer_id'],
+            customer_name=customer_name,
+            date_issued=issue_data['date_issued'],
+            date_return=date_return,
+            status=status
+        )
+        
+        issue_id = IssueRepository.create(issue)
+        if not issue_id:
+            return False, "Failed to create issue"
+        
+        # Update book availability only if status is 'issued'
+        if status == 'issued':
+            if not BookRepository.decrease_available_copies(issue_data['book_id']):
+                # Rollback: delete the issue we just created
+                IssueRepository.delete(issue_id)
+                return False, "Failed to update book availability"
+        
+        return True, f"Issue created successfully (ID: {issue_id})"
 
 

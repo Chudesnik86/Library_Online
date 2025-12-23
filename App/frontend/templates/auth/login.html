@@ -11,7 +11,7 @@
     <div class="auth-container">
         <div class="auth-card">
             <div class="auth-title">📚 Library Online</div>
-            <div class="auth-subtitle">Войдите в ваш аккаунт</div>
+            <div class="auth-subtitle">Вход для администраторов</div>
 
             {% if error %}
             <div class="alert alert-danger">
@@ -61,12 +61,11 @@
             </form>
 
             <div class="auth-footer">
-                <p>Нет аккаунта? <a href="{{ url_for('auth.register') }}">Зарегистрироваться</a></p>
                 <div class="mt-2" style="background: #D1FAE5; padding: 1rem; border-radius: 8px;">
                     <small style="color: var(--light-text);">
-                        <strong>Тестовый доступ:</strong><br>
-                        <strong>Администратор:</strong> admin@library.com / admin123<br>
-                        <strong>Или зарегистрируйте свой аккаунт</strong>
+                        <strong>Вход доступен только для администраторов</strong><br>
+                        <strong>Тестовый доступ:</strong> admin@library.com / admin123<br>
+                        <small style="color: #666;">Пользователи создаются администратором</small>
                     </small>
                 </div>
             </div>
@@ -115,12 +114,8 @@
                     // Save token to localStorage
                     localStorage.setItem('jwt_token', data.token);
                     
-                    // Redirect based on role
-                    if (data.user.role === 'admin') {
-                        window.location.href = '/admin/dashboard';
-                    } else {
-                        window.location.href = '/user/dashboard';
-                    }
+                    // Only admins can login - redirect to admin dashboard
+                    window.location.href = '/admin/dashboard';
                 } else {
                     // Show error
                     const errorDiv = document.createElement('div');

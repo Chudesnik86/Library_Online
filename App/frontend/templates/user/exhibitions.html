@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Выставки книг - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/">Главная</a>
+<a href="/user/browse_books">Книги</a>
+<a href="/user/exhibitions">Выставки</a>
+{% if customer_id %}
+<a href="/user/my_books">Мои книги</a>
+<a href="/user/profile">Профиль</a>
+<span style="margin-left: auto; color: white;">📖 {{ user_name or 'Читатель' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <h1 class="card-title">📚 Выставки книг</h1>
+        <p style="color: var(--dark-text); margin-bottom: 1.5rem;">
+            Здесь представлены текущие выставки книг из нашей библиотеки
+        </p>
+    </div>
+
+    <div id="exhibitions-container" style="margin-top: 2rem;">
+        <div class="card">
+            <div class="text-center" style="padding: 2rem;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📚</div>
+                <p style="color: var(--light-text);">Загрузка выставок...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    const customerId = '{{ customer_id }}' || null;
+
+    async function loadExhibitions() {
+        try {
+            const exhibitions = await apiCall('/api/exhibitions/active');
+            displayExhibitions(exhibitions);
+        } catch (error) {
+            console.error('Error loading exhibitions:', error);
+            document.getElementById('exhibitions-container').innerHTML = `
+                <div class="card">
+                    <div class="text-center" style="padding: 2rem;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📚</div>
+                        <p style="color: var(--light-text);">В данный момент нет активных выставок</p>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    function displayExhibitions(exhibitions) {
+        const container = document.getElementById('exhibitions-container');
+        
+        if (!exhibitions || exhibitions.length === 0) {
+            container.innerHTML = `
+                <div class="card">
+                    <div class="text-center" style="padding: 2rem;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📚</div>
+                        <p style="color: var(--light-text);">В данный момент нет активных выставок</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = exhibitions.map(exhibition => {
+            const books = exhibition.books || [];
+            if (books.length === 0) return '';
+
+            // Format dates
+            const startDate = new Date(exhibition.start_date).toLocaleDateString('ru-RU');
+            const endDate = new Date(exhibition.end_date).toLocaleDateString('ru-RU');
+
+            return `
+                <div class="card" style="margin-bottom: 2rem; border: 2px solid var(--primary-color);">
+                    <div style="padding: 1.5rem;">
+                        <h2 style="color: var(--primary-color); margin-bottom: 0.5rem; font-size: 1.5rem;">
+                            ${exhibition.theme_name || 'Выставка книг'}
+                        </h2>
+                        ${exhibition.description ? 
+                            `<p style="color: var(--dark-text); margin-bottom: 1rem; line-height: 1.6;">${exhibition.description}</p>` : 
+                            ''
+                        }
+                        <p style="color: var(--light-text); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                            📅 Период: ${startDate} - ${endDate}
+                        </p>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
+                            ${books.map(book => {
+                                const coverUrl = book.covers && book.covers.length > 0 
+                                    ? `/static/uploads/${book.covers[0].file_name}` 
+                                    : (book.cover_image || '');
+                                
+                                const authorNames = book.author_names && book.author_names.length > 0
+                                    ? book.author_names.join(', ')
+                                    : (book.author || 'Автор не указан');
+
+                                return `
+                                    <div class="exhibition-book-card" 
+                                         onclick="window.location.href='/user/browse_books?book=${book.id}'"
+                                         style="cursor: pointer; border: 1px solid #E5E7EB; border-radius: 8px; 
+                                                padding: 1rem; background: white; transition: transform 0.2s, box-shadow 0.2s;
+                                                box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                                         onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.15)';"
+                                         onmouseout="this.style.transform=''; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)';">
+                                        ${coverUrl ? 
+                                            `<img src="${coverUrl}" alt="${book.title}" 
+                                                  style="width: 100%; height: 280px; object-fit: cover; border-radius: 6px; margin-bottom: 0.75rem;
+                                                         background: #F3F4F6;" 
+                                                  onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'280\'%3E%3Crect fill=\'%23E5E7EB\' width=\'200\' height=\'280\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' fill=\'%239CA3AF\' font-size=\'14\'%3EНет обложки%3C/text%3E%3C/svg%3E';" />` : 
+                                            `<div style="width: 100%; height: 280px; background: #F3F4F6; border-radius: 6px; 
+                                                       display: flex; align-items: center; justify-content: center; 
+                                                       font-size: 3rem; margin-bottom: 0.75rem;">📖</div>`
+                                        }
+                                        <div>
+                                            <h4 style="margin: 0 0 0.5rem 0; color: var(--primary-color); font-size: 1rem; 
+                                                      line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; 
+                                                      -webkit-box-orient: vertical; overflow: hidden;">
+                                                ${book.title}
+                                            </h4>
+                                            <p style="margin: 0; color: var(--dark-text); font-size: 0.85rem; 
+                                                     display: -webkit-box; -webkit-line-clamp: 1; 
+                                                     -webkit-box-orient: vertical; overflow: hidden;">
+                                                ${authorNames}
+                                            </p>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadExhibitions);
+</script>
+
+<style>
+    .exhibition-book-card {
+        transition: all 0.2s ease;
+    }
+    
+    .exhibition-book-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+    }
+</style>
+{% endblock %}
+

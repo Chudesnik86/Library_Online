@@ -63,8 +63,12 @@ class CustomerRepository:
                 ))
                 return True
         except Exception as e:
-            print(f"Error creating customer: {e}")
-            return False
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Error creating customer {customer.id}: {e}")
+            print(f"Traceback: {error_details}")
+            # Re-raise to get better error handling upstream
+            raise
     
     @staticmethod
     def update(customer: Customer) -> bool:

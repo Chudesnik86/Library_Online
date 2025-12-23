@@ -6,6 +6,7 @@
 <a href="/admin/dashboard">Панель</a>
 <a href="/admin/customers">Читатели</a>
 <a href="/admin/books">Книги</a>
+<a href="/admin/authors">Авторы</a>
 <a href="/admin/issues">Выдачи</a>
 <a href="/admin/exhibitions">Выставки</a>
 <a href="/admin/reports">Отчеты</a>
@@ -21,6 +22,7 @@
         <div class="flex gap-2 mb-3">
             <button class="btn btn-primary" onclick="generateFullReport()">📊 Полный отчет</button>
             <button class="btn btn-danger" onclick="generateOverdueReport()">⚠️ Просроченные книги</button>
+            <button class="btn btn-success" id="export-csv-btn" onclick="exportToCSV()" style="display: none;">📥 Экспорт в CSV</button>
             <button class="btn" onclick="clearReport()">🗑️ Очистить</button>
         </div>
 
@@ -34,7 +36,13 @@
 {% block scripts %}
 {{ super() }}
 <script>
-    async function generateFullReport() {
+    // Store current report data for sorting and export
+    let currentReportData = [];
+    let currentSortColumn = 'return_date'; // Default sort by "Вернуть до"
+    let currentSortDirection = 'asc'; // Default ascending
+
+    // Make functions globally available
+    window.generateFullReport = async function() {
         try {
             const report = await apiCall('/api/reports/full');
             const stats = report.statistics;
@@ -123,60 +131,222 @@
         }
     }
 
-    async function generateOverdueReport() {
+    window.generateOverdueReport = async function() {
         try {
             const report = await apiCall('/api/reports/overdue');
             
-            let html = `
-                <h2>ОТЧЕТ О ПРОСРОЧЕННЫХ КНИГАХ</h2>
-                <p><strong>Дата:</strong> ${new Date().toLocaleString('ru-RU')}</p>
-                <p><strong>Срок выдачи:</strong> 14 дней</p>
-                <hr>
-            `;
+            // Store report data
+            currentReportData = report;
+            currentSortColumn = 'return_date';
+            currentSortDirection = 'asc';
             
-            if (report.length === 0) {
-                html += '<p style="color: var(--success-color); font-size: 1.2rem;">✓ Просроченных книг нет!</p>';
-            } else {
-                html += `
-                    <p style="color: var(--danger-color); font-size: 1.2rem;">
-                        ⚠️ Найдено просроченных книг: <strong>${report.length}</strong>
-                    </p>
-                    <table style="width: 100%;">
-                        <thead>
-                            <tr>
-                                <th>Книга</th>
-                                <th>Читатель</th>
-                                <th>Дата выдачи</th>
-                                <th>Дней просрочено</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                
-                report.forEach(item => {
-                    html += `
-                        <tr style="background-color: #ffebee;">
-                            <td>${item.book_title}</td>
-                            <td>${item.customer_name}</td>
-                            <td>${item.date_issued}</td>
-                            <td style="color: var(--danger-color); font-weight: bold;">${item.days_overdue} дней</td>
-                        </tr>
-                    `;
-                });
-                
-                html += '</tbody></table>';
-            }
+            // Sort by return_date ascending by default
+            sortReportData();
             
-            document.getElementById('report-area').innerHTML = html;
+            // Show export button
+            document.getElementById('export-csv-btn').style.display = 'inline-block';
+            
+            displayOverdueReport();
             showAlert('Отчет сгенерирован!', 'success');
         } catch (error) {
             showAlert('Ошибка генерации отчета: ' + error.message, 'danger');
         }
     }
 
-    function clearReport() {
+    function sortReportData() {
+        if (!currentReportData || currentReportData.length === 0) return;
+        
+        currentReportData.sort((a, b) => {
+            let aVal = a[currentSortColumn];
+            let bVal = b[currentSortColumn];
+            
+            // Handle date strings
+            if (currentSortColumn === 'return_date' || currentSortColumn === 'date_issued') {
+                aVal = aVal || '9999-12-31'; // Put empty dates at the end
+                bVal = bVal || '9999-12-31';
+            }
+            
+            // Handle numeric values
+            if (currentSortColumn === 'days_overdue') {
+                aVal = parseInt(aVal) || 0;
+                bVal = parseInt(bVal) || 0;
+            }
+            
+            // Handle string values
+            if (typeof aVal === 'string') {
+                aVal = aVal.toLowerCase();
+                bVal = bVal.toLowerCase();
+            }
+            
+            let comparison = 0;
+            if (aVal < bVal) {
+                comparison = -1;
+            } else if (aVal > bVal) {
+                comparison = 1;
+            }
+            
+            return currentSortDirection === 'asc' ? comparison : -comparison;
+        });
+    }
+
+    window.sortTable = function(column) {
+        if (currentSortColumn === column) {
+            // Toggle direction if same column
+            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            // New column, default to ascending
+            currentSortColumn = column;
+            currentSortDirection = 'asc';
+        }
+        
+        sortReportData();
+        displayOverdueReport();
+    }
+
+    function displayOverdueReport() {
+        let html = `
+            <h2>ОТЧЕТ О ПРОСРОЧЕННЫХ КНИГАХ</h2>
+            <p><strong>Дата отчета:</strong> ${new Date().toLocaleString('ru-RU')}</p>
+            <p><strong>Системная дата:</strong> 2018-01-01</p>
+                <p><strong>Срок выдачи:</strong> 21 день</p>
+            <hr>
+        `;
+        
+        if (currentReportData.length === 0) {
+            html += '<p style="color: var(--success-color); font-size: 1.2rem;">✓ Просроченных книг нет!</p>';
+        } else {
+            html += `
+                <p style="color: var(--danger-color); font-size: 1.2rem;">
+                    ⚠️ Найдено просроченных книг: <strong>${currentReportData.length}</strong>
+                </p>
+                <table id="overdue-table" style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTable('book_title')" 
+                                class="sortable-header" 
+                                style="cursor: pointer; user-select: none; padding: 0.75rem; background: var(--primary-color); color: white; text-align: left; transition: background-color 0.2s;">
+                                Книга ${getSortIndicator('book_title')}
+                            </th>
+                            <th onclick="sortTable('customer_name')" 
+                                class="sortable-header" 
+                                style="cursor: pointer; user-select: none; padding: 0.75rem; background: var(--primary-color); color: white; text-align: left; transition: background-color 0.2s;">
+                                Читатель ${getSortIndicator('customer_name')}
+                            </th>
+                            <th onclick="sortTable('date_issued')" 
+                                class="sortable-header" 
+                                style="cursor: pointer; user-select: none; padding: 0.75rem; background: var(--primary-color); color: white; text-align: left; transition: background-color 0.2s;">
+                                Дата выдачи ${getSortIndicator('date_issued')}
+                            </th>
+                            <th onclick="sortTable('return_date')" 
+                                class="sortable-header" 
+                                style="cursor: pointer; user-select: none; padding: 0.75rem; background: var(--primary-color); color: white; text-align: left; transition: background-color 0.2s;">
+                                Вернуть до ${getSortIndicator('return_date')}
+                            </th>
+                            <th onclick="sortTable('days_overdue')" 
+                                class="sortable-header" 
+                                style="cursor: pointer; user-select: none; padding: 0.75rem; background: var(--primary-color); color: white; text-align: left; transition: background-color 0.2s;">
+                                Дней просрочено ${getSortIndicator('days_overdue')}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            currentReportData.forEach(item => {
+                html += `
+                    <tr style="background-color: #ffebee;">
+                        <td style="padding: 0.75rem; border-bottom: 1px solid #ddd;">${item.book_title}</td>
+                        <td style="padding: 0.75rem; border-bottom: 1px solid #ddd;">${item.customer_name}</td>
+                        <td style="padding: 0.75rem; border-bottom: 1px solid #ddd;">${item.date_issued}</td>
+                        <td style="padding: 0.75rem; border-bottom: 1px solid #ddd;">${item.return_date || 'Не указана'}</td>
+                        <td style="padding: 0.75rem; border-bottom: 1px solid #ddd; color: var(--danger-color); font-weight: bold;">${item.days_overdue} дней</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+        }
+        
+        document.getElementById('report-area').innerHTML = html;
+        
+        // Add hover effects for sortable headers
+        setTimeout(() => {
+            const headers = document.querySelectorAll('.sortable-header');
+            headers.forEach(header => {
+                header.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = '#043a2d';
+                });
+                header.addEventListener('mouseleave', function() {
+                    this.style.backgroundColor = 'var(--primary-color)';
+                });
+            });
+        }, 100);
+    }
+
+    function getSortIndicator(column) {
+        if (currentSortColumn === column) {
+            return currentSortDirection === 'asc' ? '↑' : '↓';
+        }
+        return '';
+    }
+
+    window.exportToCSV = function() {
+        if (!currentReportData || currentReportData.length === 0) {
+            showAlert('Нет данных для экспорта', 'warning');
+            return;
+        }
+
+        // CSV headers
+        const headers = ['Книга', 'Читатель', 'Дата выдачи', 'Вернуть до', 'Дней просрочено'];
+        const csvRows = [headers.join(',')];
+
+        // Add data rows (already sorted)
+        currentReportData.forEach(item => {
+            const row = [
+                `"${item.book_title.replace(/"/g, '""')}"`,
+                `"${item.customer_name.replace(/"/g, '""')}"`,
+                item.date_issued || '',
+                item.return_date || 'Не указана',
+                item.days_overdue || 0
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        // Create CSV content
+        const csvContent = csvRows.join('\n');
+        
+        // Add BOM for UTF-8 to ensure proper encoding in Excel
+        const BOM = '\uFEFF';
+        const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        // Create download link
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        // Generate filename with current date
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        const filename = `напоминания_просроченные_книги_${dateStr}.csv`;
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.display = 'none';
+        
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showAlert('Данные экспортированы в CSV!', 'success');
+    }
+
+    window.clearReport = function() {
+        currentReportData = [];
         document.getElementById('report-area').innerHTML = 
             '<p class="text-center" style="color: var(--light-text);">Выберите тип отчета для генерации</p>';
+        document.getElementById('export-csv-btn').style.display = 'none';
     }
 </script>
 {% endblock %}

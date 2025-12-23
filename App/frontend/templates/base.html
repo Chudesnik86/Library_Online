@@ -195,10 +195,12 @@
                 });
                 
                 // If token expired or invalid, try to refresh or redirect to login
+                // But don't redirect for public endpoints (books, authors viewing)
                 if (response.status === 401) {
                     removeToken();
-                    // Only redirect if not already on login page
-                    if (!window.location.pathname.includes('/auth/login')) {
+                    // Only redirect if not on public pages (browse_books) and not already on login page
+                    const isPublicPage = window.location.pathname.includes('/browse_books');
+                    if (!isPublicPage && !window.location.pathname.includes('/auth/login')) {
                         window.location.href = '/auth/login';
                     }
                     throw new Error('Требуется авторизация');

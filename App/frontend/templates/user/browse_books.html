@@ -3,12 +3,15 @@
 {% block title %}Доступные книги - Library Online{% endblock %}
 
 {% block nav %}
-<a href="/user/dashboard">Главная</a>
+<a href="/">Главная</a>
 <a href="/user/browse_books">Книги</a>
+<a href="/user/exhibitions">Выставки</a>
+{% if customer_id %}
 <a href="/user/my_books">Мои книги</a>
 <a href="/user/profile">Профиль</a>
 <span style="margin-left: auto; color: white;">📖 {{ user_name or 'Читатель' }}</span>
 <a href="/auth/logout">Выход</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -16,9 +19,87 @@
     <div class="card">
         <h1 class="card-title">Доступные книги</h1>
         
-        <div class="search-bar">
-            <input type="text" class="form-control" id="search-input" placeholder="Поиск книг..." />
-            <button class="btn btn-primary" onclick="searchBooks()">🔍 Поиск</button>
+        <div class="search-bar" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 0.75rem; align-items: end;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: var(--dark-text);">Название</label>
+                    <input type="text" class="form-control" id="search-title" placeholder="Поиск по названию..." />
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: var(--dark-text);">Автор</label>
+                    <input type="text" class="form-control" id="search-author" placeholder="Поиск по автору..." />
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.25rem; font-weight: 500; color: var(--dark-text);">Тема/Жанр</label>
+                    <input type="text" class="form-control" id="search-theme" placeholder="Поиск по теме..." />
+                </div>
+                <div>
+                    <button class="btn btn-primary" onclick="searchBooks()" style="width: 100%;">🔍 Поиск</button>
+                </div>
+            </div>
+            <button class="btn" onclick="clearSearch()" style="align-self: flex-start; padding: 0.5rem 1rem;">Очистить</button>
+        </div>
+
+        <!-- Book Details Card (shown on page instead of modal) -->
+        <div id="book-details-card" style="display: none; margin-bottom: 2rem;">
+            <div class="card" style="background: white; border: 2px solid var(--primary-color);">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                    <h2 style="margin: 0; color: var(--primary-color);">Детали книги</h2>
+                    <button class="btn" onclick="closeBookDetails()" style="padding: 0.5rem;">✕ Закрыть</button>
+                </div>
+                <div style="display: grid; grid-template-columns: 200px 1fr; gap: 2rem; align-items: start;">
+                    <div style="position: relative;">
+                        <img id="book-details-cover" src="" alt="Обложка книги" 
+                             style="width: 200px; height: 280px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+                                    background: #F3F4F6; object-fit: cover; display: block;" 
+                             onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'280\'%3E%3Crect fill=\'%23E5E7EB\' width=\'200\' height=\'280\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' fill=\'%239CA3AF\' font-size=\'14\'%3EНет обложки%3C/text%3E%3C/svg%3E';" />
+                        <!-- Cover navigation buttons -->
+                        <div id="cover-navigation" style="display: none; margin-top: 0.75rem; display: flex; justify-content: center; align-items: center; gap: 0.5rem;">
+                            <button id="cover-prev-btn" class="btn" onclick="changeCover(-1)" disabled 
+                                    style="padding: 0.5rem; width: 40px; height: 40px; border-radius: 50%; 
+                                           display: flex; align-items: center; justify-content: center; 
+                                           font-size: 1.2rem; line-height: 1;" 
+                                    title="Предыдущая обложка">←</button>
+                            <span id="cover-counter" style="display: flex; align-items: center; padding: 0.4rem 0.75rem; 
+                                                             color: var(--dark-text); font-size: 0.9rem; min-width: 50px; 
+                                                             justify-content: center;">
+                                <span id="cover-current">1</span> / <span id="cover-total">1</span>
+                            </span>
+                            <button id="cover-next-btn" class="btn" onclick="changeCover(1)" disabled 
+                                    style="padding: 0.5rem; width: 40px; height: 40px; border-radius: 50%; 
+                                           display: flex; align-items: center; justify-content: center; 
+                                           font-size: 1.2rem; line-height: 1;" 
+                                    title="Следующая обложка">→</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 id="book-details-title-text" style="margin-top: 0; color: var(--primary-color); font-size: 1.5rem;"></h3>
+                        <div style="margin-bottom: 1rem;">
+                            <p style="margin: 0.5rem 0;"><strong>Автор:</strong> <span id="book-details-author">-</span></p>
+                            <p style="margin: 0.5rem 0;"><strong>ISBN:</strong> <span id="book-details-isbn">-</span></p>
+                            <p style="margin: 0.5rem 0;"><strong>Категория:</strong> <span id="book-details-category">-</span></p>
+                            <p style="margin: 0.5rem 0;"><strong>Доступно:</strong> <span id="book-details-available"></span> из <span id="book-details-total"></span></p>
+                        </div>
+                        <div style="margin-top: 1.5rem;">
+                            <h4 style="margin-bottom: 0.5rem; color: var(--primary-color);">Описание:</h4>
+                            <div id="book-details-description" class="scrollable-description" style="max-height: 200px; overflow-y: auto; padding: 0.75rem; 
+                                                                      background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px;
+                                                                      line-height: 1.6; color: var(--dark-text); white-space: pre-wrap;
+                                                                      scrollbar-width: thin; scrollbar-color: var(--primary-color) #E5E7EB;">
+                                Описание отсутствует
+                            </div>
+                        </div>
+                        <div style="margin-top: 1.5rem;" id="book-details-actions">
+                            <!-- Action buttons will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Books count display -->
+        <div id="books-count" style="margin-bottom: 1rem; padding: 0.75rem 1rem; background: #F3F4F6; border-radius: 8px; display: none;">
+            <strong style="color: var(--primary-color);">Найдено книг: <span id="books-count-number">0</span></strong>
         </div>
 
         <div class="table-container">
@@ -36,71 +117,125 @@
                     <tr><td colspan="5" class="text-center">Загрузка...</td></tr>
                 </tbody>
             </table>
+</div>
+
+        <!-- Pagination -->
+        <div id="pagination-container" style="display: none; margin-top: 1.5rem; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                <div style="color: var(--dark-text);">
+                    Показано <span id="pagination-info-start">0</span> - <span id="pagination-info-end">0</span> из <span id="pagination-info-total">0</span> книг
+        </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <label style="color: var(--dark-text); font-size: 0.9rem;">Книг на странице:</label>
+                    <select id="pagination-per-page" class="form-control" style="width: auto; padding: 0.25rem 0.5rem;" onchange="changePerPage(parseInt(this.value))">
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                        <option value="50" selected>50</option>
+                    </select>
+                </div>
+                    </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <button id="pagination-prev" class="btn" onclick="changePage(currentPage - 1)" disabled>← Предыдущая</button>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="color: var(--dark-text);">Страница</span>
+                    <input type="number" id="pagination-page-input" min="1" value="1" 
+                           style="width: 60px; padding: 0.25rem 0.5rem; border: 1px solid #ddd; border-radius: 4px; text-align: center;"
+                           onchange="goToPage(parseInt(this.value))" />
+                    <span style="color: var(--dark-text);">из <span id="pagination-total-pages">1</span></span>
+                </div>
+                <button id="pagination-next" class="btn" onclick="changePage(currentPage + 1)" disabled>Следующая →</button>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Book Details Modal -->
-<div id="book-details-modal" class="modal">
+<!-- Author Biography Modal -->
+<div id="author-biography-modal" class="modal">
     <div class="modal-content" style="max-width: 700px;">
         <div class="modal-header">
-            <span class="modal-close" onclick="closeBookDetailsModal()">&times;</span>
-            <h2 class="modal-title" id="book-details-title">Детали книги</h2>
+            <h2 class="modal-title" id="author-biography-name">Биография автора</h2>
+            <span class="modal-close" onclick="closeAuthorBiography()">&times;</span>
         </div>
-        <div style="padding: 1.5rem 0;">
-            <div style="display: grid; grid-template-columns: 200px 1fr; gap: 2rem; align-items: start;">
-                <div>
-                    <img id="book-details-cover" src="" alt="Обложка книги" 
-                         style="width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
-                                background: #F3F4F6; min-height: 280px; object-fit: cover; display: block;" 
-                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'280\'%3E%3Crect fill=\'%23E5E7EB\' width=\'200\' height=\'280\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' fill=\'%239CA3AF\' font-size=\'14\'%3EНет обложки%3C/text%3E%3C/svg%3E';" />
+        <div style="padding: 1.5rem;">
+            <div id="author-biography-dates" style="margin-bottom: 1rem; color: var(--dark-text);">
+                <!-- Dates will be inserted here -->
                 </div>
-                <div>
-                    <h3 id="book-details-title-text" style="margin-top: 0; color: var(--primary-color); font-size: 1.5rem;"></h3>
-                    <div style="margin-bottom: 1rem;">
-                        <p style="margin: 0.5rem 0;"><strong>Автор:</strong> <span id="book-details-author">-</span></p>
-                        <p style="margin: 0.5rem 0;"><strong>ISBN:</strong> <span id="book-details-isbn">-</span></p>
-                        <p style="margin: 0.5rem 0;"><strong>Категория:</strong> <span id="book-details-category">-</span></p>
-                        <p style="margin: 0.5rem 0;"><strong>Доступно:</strong> <span id="book-details-available"></span> из <span id="book-details-total"></span></p>
+            <div id="author-biography-content" class="scrollable-description" style="max-height: 400px; overflow-y: auto; padding: 1rem; 
+                                                                      background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 6px;
+                                                                      line-height: 1.6; color: var(--dark-text); white-space: pre-wrap;
+                                                                      scrollbar-width: thin; scrollbar-color: var(--primary-color) #E5E7EB;">
+                Биография отсутствует
                     </div>
-                    <div style="margin-top: 1.5rem;">
-                        <h4 style="margin-bottom: 0.5rem; color: var(--primary-color);">Описание:</h4>
-                        <p id="book-details-description" style="line-height: 1.6; color: var(--dark-text); white-space: pre-wrap;">
-                            Описание отсутствует
-                        </p>
-                    </div>
-                    <div style="margin-top: 1.5rem;" id="book-details-actions">
-                        <!-- Action buttons will be inserted here -->
-                    </div>
-                </div>
+            <div id="author-wikipedia-button" style="margin-top: 1rem; display: none;">
+                <a id="author-wikipedia-link" href="#" target="_blank" rel="noopener noreferrer" 
+                   class="btn btn-primary" style="text-decoration: none; display: inline-block;">
+                    🌐 Узнать больше в Википедии
+                </a>
             </div>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn" onclick="closeBookDetailsModal()">Закрыть</button>
+            <button type="button" class="btn" onclick="closeAuthorBiography()">Закрыть</button>
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
 <script>
-    const customerId = '{{ customer_id }}';
+    const customerId = '{{ customer_id }}' || null; // null for unauthenticated users
+    let currentPage = 1;
+    let totalPages = 1;
+    let totalBooks = 0;
+    let booksPerPage = parseInt(localStorage.getItem('booksPerPage')) || 50; // Load from localStorage or default to 50
+    let currentSearchParams = {};
 
-    async function loadBooks() {
+    async function loadBooks(page = 1) {
         try {
-            const books = await apiCall('/api/books?available=true');
-            displayBooks(books);
+            currentPage = page;
+            currentSearchParams = {};
+            const response = await apiCall(`/api/books?available=true&page=${page}&per_page=${booksPerPage}`);
+            
+            // Handle both old format (array) and new format (object with pagination)
+            if (Array.isArray(response)) {
+                displayBooks(response, false);
+                document.getElementById('pagination-container').style.display = 'none';
+            } else {
+                displayBooks(response.books || [], false);
+                totalPages = response.total_pages || 1;
+                totalBooks = response.total || 0;
+                updatePagination();
+            }
         } catch (error) {
             showAlert('Ошибка загрузки книг: ' + error.message, 'danger');
         }
     }
 
-    function displayBooks(books) {
+    function displayBooks(books, showCount = true) {
         const tbody = document.getElementById('books-table');
+        const countDiv = document.getElementById('books-count');
+        const countNumber = document.getElementById('books-count-number');
+        
+        // Update count display
         if (books.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="text-center">Доступных книг нет</td></tr>';
+            if (showCount) {
+                countDiv.style.display = 'block';
+                countNumber.textContent = '0';
+            } else {
+                countDiv.style.display = 'none';
+            }
             return;
+        }
+
+        // Show count only if showCount is true (i.e., after search)
+        if (showCount) {
+            countDiv.style.display = 'block';
+            countNumber.textContent = books.length;
+        } else {
+            countDiv.style.display = 'none';
         }
 
         tbody.innerHTML = books.map(book => `
@@ -111,12 +246,28 @@
                        <strong>${book.title}</strong>
                     </a>
                 </td>
-                <td>${book.author || 'Не указан'}</td>
+                <td>
+                    ${(() => {
+                        const authorNames = (book.author_names && book.author_names.length > 0) 
+                            ? book.author_names 
+                            : (book.author ? book.author.split(',').map(a => a.trim()) : []);
+                        if (authorNames.length === 0) {
+                            return 'Не указан';
+                        }
+                        return authorNames.map((authorName, index) => {
+                            const escapedName = authorName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                            return `<a href="#" onclick="searchByAuthor('${escapedName}'); return false;" 
+                                       style="color: var(--primary-color); text-decoration: none; border-bottom: 1px dotted var(--primary-color); 
+                                              cursor: pointer;" 
+                                       title="Найти все книги этого автора">${authorName}</a>`;
+                        }).join(', ');
+                    })()}
+                </td>
                 <td>${book.category || 'Не указана'}</td>
                 <td>${book.available_copies} из ${book.total_copies}</td>
                 <td>
                     ${book.available_copies > 0 ? 
-                        `<button class="btn btn-success" onclick="borrowBook('${book.id}')">Взять книгу</button>` :
+                        '<span style="color: var(--success-color);">Доступна</span>' :
                         '<span style="color: var(--danger-color);">Недоступна</span>'
                     }
                 </td>
@@ -124,39 +275,309 @@
         `).join('');
     }
 
-    async function searchBooks() {
-        const searchTerm = document.getElementById('search-input').value;
+    async function searchBooks(page = 1) {
+        const title = document.getElementById('search-title').value.trim();
+        const author = document.getElementById('search-author').value.trim();
+        const theme = document.getElementById('search-theme').value.trim();
+        
         try {
-            const books = await apiCall(`/api/books?search=${encodeURIComponent(searchTerm)}`);
-            displayBooks(books.filter(b => b.available_copies > 0));
+            currentPage = page;
+            currentSearchParams = { title, author, theme };
+            
+            let url = '/api/books?available=true';
+            const params = [];
+            
+            if (title) params.push(`title=${encodeURIComponent(title)}`);
+            if (author) params.push(`author=${encodeURIComponent(author)}`);
+            if (theme) params.push(`theme=${encodeURIComponent(theme)}`);
+            
+            params.push(`page=${page}`);
+            params.push(`per_page=${booksPerPage}`);
+            
+            if (params.length > 0) {
+                url += '&' + params.join('&');
+            }
+            
+            const response = await apiCall(url);
+            
+            // Handle both old format (array) and new format (object with pagination)
+            if (Array.isArray(response)) {
+                const availableBooks = response.filter(b => b.available_copies > 0);
+                displayBooks(availableBooks, true);
+                document.getElementById('pagination-container').style.display = 'none';
+            } else {
+                const availableBooks = (response.books || []).filter(b => b.available_copies > 0);
+                displayBooks(availableBooks, true);
+                totalPages = response.total_pages || 1;
+                totalBooks = response.total || 0;
+                updatePagination();
+            }
+            
+            // Close book details when searching
+            closeBookDetails();
         } catch (error) {
             showAlert('Ошибка поиска: ' + error.message, 'danger');
         }
+    }
+
+    // Update pagination controls
+    function updatePagination() {
+        const container = document.getElementById('pagination-container');
+        if (!container) return;
+        
+        if (totalPages <= 1) {
+            container.style.display = 'none';
+            return;
+        }
+        
+        container.style.display = 'flex';
+        container.style.flexDirection = 'row';
+        
+        // Update page info
+        const start = totalBooks > 0 ? (currentPage - 1) * booksPerPage + 1 : 0;
+        const end = Math.min(currentPage * booksPerPage, totalBooks);
+        document.getElementById('pagination-info-start').textContent = start;
+        document.getElementById('pagination-info-end').textContent = end;
+        document.getElementById('pagination-info-total').textContent = totalBooks;
+        document.getElementById('pagination-total-pages').textContent = totalPages;
+        document.getElementById('pagination-page-input').value = currentPage;
+        
+        // Update buttons
+        document.getElementById('pagination-prev').disabled = currentPage <= 1;
+        document.getElementById('pagination-next').disabled = currentPage >= totalPages;
+    }
+
+    // Change page
+    function changePage(page) {
+        if (page < 1 || page > totalPages) return;
+        
+        // Check if we're in search mode
+        const hasSearch = currentSearchParams.title || currentSearchParams.author || currentSearchParams.theme;
+        if (hasSearch) {
+            searchBooks(page);
+        } else {
+            loadBooks(page);
+        }
+    }
+
+    // Go to specific page
+    function goToPage(page) {
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        changePage(page);
+    }
+
+    // Show author biography
+    async function showAuthorBiography(authorId) {
+        if (!authorId) {
+            showAlert('Информация об авторе недоступна', 'warning');
+            return;
+        }
+        
+        try {
+            const author = await apiCall(`/api/authors/${authorId}`);
+            
+            document.getElementById('author-biography-name').textContent = `Биография: ${author.full_name}`;
+            
+            // Display dates
+            const datesDiv = document.getElementById('author-biography-dates');
+            let datesText = '';
+            if (author.birth_date) {
+                datesText += `Родился: ${author.birth_date}`;
+            }
+            if (author.death_date) {
+                datesText += datesText ? ' | ' : '';
+                datesText += `Умер: ${author.death_date}`;
+            }
+            datesDiv.textContent = datesText || '';
+            datesDiv.style.display = datesText ? 'block' : 'none';
+            
+            // Display biography
+            const biographyDiv = document.getElementById('author-biography-content');
+            biographyDiv.textContent = author.biography || 'Биография отсутствует';
+            
+            // Show/hide Wikipedia button
+            const wikipediaButton = document.getElementById('author-wikipedia-button');
+            const wikipediaLink = document.getElementById('author-wikipedia-link');
+            if (author.wikipedia_url) {
+                wikipediaLink.href = author.wikipedia_url;
+                wikipediaButton.style.display = 'block';
+            } else {
+                wikipediaButton.style.display = 'none';
+            }
+            
+            document.getElementById('author-biography-modal').classList.add('active');
+        } catch (error) {
+            showAlert('Ошибка загрузки биографии: ' + error.message, 'danger');
+        }
+    }
+
+    // Close author biography
+    function closeAuthorBiography() {
+        document.getElementById('author-biography-modal').classList.remove('active');
+    }
+
+    // Change books per page
+    function changePerPage(perPage) {
+        booksPerPage = perPage;
+        localStorage.setItem('booksPerPage', perPage.toString());
+        currentPage = 1; // Reset to first page
+        const hasSearch = currentSearchParams.title || currentSearchParams.author || currentSearchParams.theme;
+        if (hasSearch) {
+            searchBooks(1);
+        } else {
+            loadBooks(1);
+        }
+    }
+
+    // Search by author (when clicking on author link)
+    function searchByAuthor(authorName) {
+        document.getElementById('search-author').value = authorName;
+        document.getElementById('search-title').value = '';
+        document.getElementById('search-theme').value = '';
+        closeBookDetails();
+        searchBooks(1);
+    }
+
+    // Set per page selector on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const perPageSelect = document.getElementById('pagination-per-page');
+        if (perPageSelect) {
+            perPageSelect.value = booksPerPage;
+        }
+    });
+    
+    function clearSearch() {
+        document.getElementById('search-title').value = '';
+        document.getElementById('search-author').value = '';
+        document.getElementById('search-theme').value = '';
+        document.getElementById('books-count').style.display = 'none'; // Hide count when clearing
+        currentSearchParams = {};
+        currentPage = 1;
+        loadBooks(1);
+        closeBookDetails();
     }
 
     async function borrowBook(bookId) {
         const confirmed = await confirmAction('Вы хотите взять эту книгу?', 'Взять книгу');
         if (!confirmed) return;
 
-        try {
-            await apiCall('/api/issues', {
-                method: 'POST',
-                body: JSON.stringify({
-                    book_id: bookId,
-                    customer_id: customerId
-                })
-            });
-            showAlert('Книга успешно выдана!', 'success');
-            loadBooks();
-        } catch (error) {
-            showAlert('Ошибка: ' + error.message, 'danger');
-        }
+        // Redirect to login page (only admin can issue books)
+        window.location.href = '/auth/login';
     }
 
-    // Show book details modal
+    // Cover navigation
+    let currentCovers = [];
+    let currentCoverIndex = 0;
+    
+    // Author biography
+    let currentAuthorsInfo = []; // Array of author info objects
+
+    function changeCover(direction) {
+        if (currentCovers.length === 0) return;
+        
+        currentCoverIndex += direction;
+        
+        if (currentCoverIndex < 0) currentCoverIndex = 0;
+        if (currentCoverIndex >= currentCovers.length) currentCoverIndex = currentCovers.length - 1;
+        
+        updateCoverDisplay();
+    }
+
+    function updateCoverDisplay() {
+        const coverImg = document.getElementById('book-details-cover');
+        const prevBtn = document.getElementById('cover-prev-btn');
+        const nextBtn = document.getElementById('cover-next-btn');
+        const currentSpan = document.getElementById('cover-current');
+        const totalSpan = document.getElementById('cover-total');
+        const navDiv = document.getElementById('cover-navigation');
+        
+        if (currentCovers.length === 0) {
+            navDiv.style.display = 'none';
+            coverImg.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'280\'%3E%3Crect fill=\'%23E5E7EB\' width=\'200\' height=\'280\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' fill=\'%239CA3AF\' font-size=\'14\'%3EНет обложки%3C/text%3E%3C/svg%3E';
+            return;
+        }
+        
+        navDiv.style.display = 'flex';
+        const currentCover = currentCovers[currentCoverIndex];
+        coverImg.src = currentCover.file_name || currentCover;
+        
+        currentSpan.textContent = currentCoverIndex + 1;
+        totalSpan.textContent = currentCovers.length;
+        
+        // Disable buttons at boundaries
+        prevBtn.disabled = currentCoverIndex <= 0;
+        nextBtn.disabled = currentCoverIndex >= currentCovers.length - 1;
+    }
+
+    // Show book details card on page
     function showBookDetails(book) {
         document.getElementById('book-details-title-text').textContent = book.title;
-        document.getElementById('book-details-author').textContent = book.author || 'Не указан';
+        
+        // Load covers
+        currentCovers = [];
+        if (book.covers && book.covers.length > 0) {
+            currentCovers = book.covers.map(c => c.file_name || c);
+        } else if (book.cover_image) {
+            currentCovers = [book.cover_image];
+        }
+        currentCoverIndex = 0;
+        updateCoverDisplay();
+        // Display authors with clickable names for biography - use authors_info if available
+        const authorElement = document.getElementById('book-details-author');
+        currentAuthorsInfo = [];
+        
+        if (book.authors_info && book.authors_info.length > 0) {
+            // Store all authors with info (have id)
+            currentAuthorsInfo = book.authors_info.filter(a => a.id);
+            
+            // Use authors_info - make names clickable if author has id (for biography)
+            authorElement.innerHTML = book.authors_info.map((author, index) => {
+                const authorName = author.full_name || author.name || 'Неизвестный автор';
+                const hasId = author.id;
+                const hasWikipedia = author.wikipedia_url;
+                
+                // If author has id, make name clickable for biography
+                if (hasId) {
+                    let linkHtml = `<a href="#" onclick="showAuthorBiography(${author.id}); return false;" 
+                                       style="color: var(--primary-color); text-decoration: none; border-bottom: 1px dotted var(--primary-color); 
+                                              cursor: pointer; margin-right: 0.5rem;" 
+                                       title="Просмотреть биографию автора">${authorName}</a>`;
+                    
+                    // Add Wikipedia link icon if available
+                    if (hasWikipedia) {
+                        linkHtml += ` <a href="${author.wikipedia_url}" target="_blank" rel="noopener noreferrer" 
+                                         style="color: var(--primary-color); text-decoration: none; margin-left: 0.25rem;" 
+                                         title="Открыть страницу об авторе в Википедии">🔗</a>`;
+                    }
+                    
+                    return linkHtml;
+                } else {
+                    // No id, just show name with Wikipedia link if available
+                    if (hasWikipedia) {
+                        return `<span style="margin-right: 0.5rem;">${authorName} <a href="${author.wikipedia_url}" target="_blank" rel="noopener noreferrer" 
+                                         style="color: var(--primary-color); text-decoration: none; margin-left: 0.25rem;" 
+                                         title="Открыть страницу об авторе в Википедии">🔗</a></span>`;
+                    } else {
+                        return `<span style="margin-right: 0.5rem;">${authorName}</span>`;
+                    }
+                }
+            }).join(', ');
+        } else {
+            // Fallback to author_names or legacy author field
+            const authorNames = book.author_names && book.author_names.length > 0 
+                ? book.author_names 
+                : (book.author ? book.author.split(',').map(a => a.trim()) : []);
+            
+            if (authorNames.length === 0) {
+                authorElement.textContent = 'Не указан';
+            } else {
+                authorElement.innerHTML = authorNames.map((authorName) => {
+                    return `<span style="margin-right: 0.5rem;">${authorName}</span>`;
+                }).join(', ');
+            }
+            currentAuthorsInfo = [];
+        }
         document.getElementById('book-details-isbn').textContent = book.isbn || 'Не указан';
         document.getElementById('book-details-category').textContent = book.category || 'Не указана';
         document.getElementById('book-details-available').textContent = book.available_copies;
@@ -170,41 +591,63 @@
             coverImg.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'280\'%3E%3Crect fill=\'%23E5E7EB\' width=\'200\' height=\'280\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' fill=\'%239CA3AF\' font-size=\'14\'%3EНет обложки%3C/text%3E%3C/svg%3E';
         }
         
-        // Add action button
+        // Add action button - removed, only admin can issue books
         const actionsDiv = document.getElementById('book-details-actions');
         if (book.available_copies > 0) {
-            actionsDiv.innerHTML = `<button class="btn btn-success" onclick="borrowBookFromModal('${book.id}')">Взять книгу</button>`;
+            actionsDiv.innerHTML = '<span style="color: var(--success-color);">Книга доступна</span>';
         } else {
             actionsDiv.innerHTML = '<span style="color: var(--danger-color);">Книга недоступна</span>';
         }
         
-        document.getElementById('book-details-modal').classList.add('active');
+        // Show the card and scroll to it
+        const card = document.getElementById('book-details-card');
+        card.style.display = 'block';
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    function closeBookDetailsModal() {
-        document.getElementById('book-details-modal').classList.remove('active');
+    function closeBookDetails() {
+        document.getElementById('book-details-card').style.display = 'none';
     }
 
-    // Close book details modal on background click
-    document.addEventListener('DOMContentLoaded', function() {
-        const bookDetailsModal = document.getElementById('book-details-modal');
-        if (bookDetailsModal) {
-            bookDetailsModal.addEventListener('click', function(e) {
-                if (e.target === this) {
-                    closeBookDetailsModal();
+    async function borrowBookFromDetails(bookId) {
+        // Redirect to login (only admin can issue books)
+        window.location.href = '/auth/login';
+    }
+
+    // Check if book ID is in URL parameters and load that book
+    async function checkUrlForBook() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const bookId = urlParams.get('book');
+        
+        if (bookId) {
+            try {
+                // Load the specific book
+                const book = await apiCall(`/api/books/${bookId}`);
+                if (book) {
+                    // Show the book details card
+                    showBookDetails(book);
                 }
+            } catch (error) {
+                console.error('Error loading book from URL:', error);
+                showAlert('Ошибка загрузки книги: ' + error.message, 'danger');
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadBooks();
+        // Check for book parameter in URL after a short delay to ensure page is loaded
+        setTimeout(checkUrlForBook, 500);
+    });
+    
+    // Add Enter key support for search fields
+    ['search-title', 'search-author', 'search-theme'].forEach(id => {
+        const field = document.getElementById(id);
+        if (field) {
+            field.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchBooks();
             });
         }
-    });
-
-    async function borrowBookFromModal(bookId) {
-        closeBookDetailsModal();
-        await borrowBook(bookId);
-    }
-
-    document.addEventListener('DOMContentLoaded', loadBooks);
-    document.getElementById('search-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') searchBooks();
     });
 </script>
 {% endblock %}

@@ -32,26 +32,32 @@ class CustomerService:
         Create a new customer
         Returns: (success: bool, message: str)
         """
-        # Validate required fields
-        if not customer_data.get('name'):
-            return False, "Customer name is required"
-        
-        # Generate ID automatically if not provided
-        if not customer_data.get('id'):
-            customer_data['id'] = CustomerRepository.generate_unique_id()
-        else:
-            # Check if customer already exists (only if ID was provided)
-            existing = CustomerRepository.find_by_id(customer_data['id'])
-            if existing:
-                return False, "Customer with this ID already exists"
-        
-        # Create customer
-        customer = Customer.from_dict(customer_data)
-        success = CustomerRepository.create(customer)
-        
-        if success:
-            return True, f"Customer created successfully with ID: {customer_data['id']}"
-        return False, "Failed to create customer"
+        try:
+            # Validate required fields
+            if not customer_data.get('name'):
+                return False, "Customer name is required"
+            
+            # Generate ID automatically if not provided
+            if not customer_data.get('id'):
+                customer_data['id'] = CustomerRepository.generate_unique_id()
+            else:
+                # Check if customer already exists (only if ID was provided)
+                existing = CustomerRepository.find_by_id(customer_data['id'])
+                if existing:
+                    return False, "Customer with this ID already exists"
+            
+            # Create customer
+            customer = Customer.from_dict(customer_data)
+            success = CustomerRepository.create(customer)
+            
+            if success:
+                return True, f"Customer created successfully with ID: {customer_data['id']}"
+            return False, "Failed to create customer"
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Error in create_customer: {error_details}")
+            return False, f"Error creating customer: {str(e)}"
     
     @staticmethod
     def update_customer(customer_data: dict) -> tuple[bool, str]:
@@ -94,5 +100,10 @@ class CustomerService:
         if success:
             return True, "Customer deleted successfully"
         return False, "Failed to delete customer"
+    
+    @staticmethod
+    def generate_customer_id() -> str:
+        """Generate a unique customer ID"""
+        return CustomerRepository.generate_unique_id()
 
 

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Управление авторами - Library Online{% endblock %}
+
+{% block nav %}
+<a href="/admin/dashboard">Панель</a>
+<a href="/admin/customers">Читатели</a>
+<a href="/admin/books">Книги</a>
+<a href="/admin/authors">Авторы</a>
+<a href="/admin/issues">Выдачи</a>
+<a href="/admin/exhibitions">Выставки</a>
+<a href="/admin/reports">Отчеты</a>
+<span style="margin-left: auto; color: white;">👨‍💼 {{ user_name or 'Администратор' }}</span>
+<a href="/auth/logout">Выход</a>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="flex-between">
+            <h1 class="card-title">Управление авторами</h1>
+            <button class="btn btn-success" onclick="showAddAuthorModal()">➕ Добавить автора</button>
+        </div>
+
+        <div class="search-bar">
+            <input type="text" class="form-control" id="search-input" placeholder="Поиск авторов..." />
+            <button class="btn btn-primary" onclick="searchAuthors()">🔍 Поиск</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>ФИО</th>
+                        <th>Дата рождения</th>
+                        <th>Дата смерти</th>
+                        <th>Биография</th>
+                        <th>Wikipedia</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="authors-table">
+                    <tr><td colspan="7" class="text-center">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Author Modal -->
+<div id="author-modal" class="modal">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h2 class="modal-title" id="modal-title">Добавить автора</h2>
+        </div>
+        <form id="author-form">
+            <input type="hidden" id="author-id" />
+            <div class="form-group">
+                <label>ФИО *</label>
+                <input type="text" class="form-control" id="author-name" required />
+            </div>
+            <div class="form-group">
+                <label>Дата рождения</label>
+                <input type="date" class="form-control" id="author-birth-date" />
+            </div>
+            <div class="form-group">
+                <label>Дата смерти</label>
+                <input type="date" class="form-control" id="author-death-date" />
+            </div>
+            <div class="form-group">
+                <label>Биография</label>
+                <textarea class="form-control" id="author-biography" rows="6" placeholder="Введите биографию автора..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Ссылка на Wikipedia</label>
+                <input type="url" class="form-control" id="author-wikipedia" placeholder="https://ru.wikipedia.org/wiki/..." />
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal()">Отмена</button>
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/admin_authors.js') }}"></script>
+{% endblock %}
+

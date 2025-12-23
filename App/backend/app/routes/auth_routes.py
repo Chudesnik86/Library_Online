@@ -23,6 +23,14 @@ def login():
         success, user, message = AuthService.login(email, password)
         
         if success:
+            # Only allow admin login - regular users cannot login
+            if user.role != 'admin':
+                error_msg = 'Вход в систему доступен только для администраторов. Обычные пользователи не могут входить в систему.'
+                if request.is_json:
+                    return jsonify({'success': False, 'error': error_msg}), 403
+                flash(error_msg, 'danger')
+                return render_template('auth/login.html', error=error_msg)
+            
             # Generate JWT token
             token = AuthService.generate_user_token(user)
             
@@ -51,11 +59,8 @@ def login():
             # For HTML form, store token in session and redirect
             session['jwt_token'] = token
             
-            # Redirect based on role
-            if user.role == 'admin':
-                return redirect(url_for('admin.dashboard'))
-            else:
-                return redirect(url_for('user.dashboard'))
+            # Redirect to admin dashboard (only admins can login)
+            return redirect(url_for('admin.dashboard'))
         else:
             # If API request, return JSON error
             if request.is_json:
@@ -67,30 +72,7 @@ def login():
     return render_template('auth/login.html')
 
 
-@auth_bp.route('/register', methods=['GET', 'POST'])
-def register():
-    """Registration page"""
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-        name = request.form.get('name')
-        
-        # Validate passwords match
-        if password != confirm_password:
-            flash('Пароли не совпадают', 'danger')
-            return render_template('auth/register.html', error='Пароли не совпадают')
-        
-        success, user, message = AuthService.register(email, password, name)
-        
-        if success:
-            flash('Регистрация успешна! Войдите в систему.', 'success')
-            return redirect(url_for('auth.login'))
-        else:
-            flash(message, 'danger')
-            return render_template('auth/register.html', error=message)
-    
-    return render_template('auth/register.html')
+# Registration removed - only admin can create users
 
 
 @auth_bp.route('/logout', methods=['GET', 'POST'])
@@ -104,7 +86,7 @@ def logout():
         return jsonify({'success': True, 'message': 'Вы вышли из системы'})
     
     flash('Вы вышли из системы', 'info')
-    return redirect(url_for('auth.login'))
+    return redirect(url_for('user.browse_books'))  # Redirect to public catalog
 
 
 @auth_bp.route('/api/verify', methods=['GET', 'POST'])

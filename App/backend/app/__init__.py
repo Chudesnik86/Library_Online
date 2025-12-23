@@ -1,7 +1,7 @@
 """
 Flask application factory
 """
-from flask import Flask
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_swagger_ui import get_swaggerui_blueprint
 
@@ -19,10 +19,11 @@ def create_app():
     CORS(app)
     
     # Initialize database
-    from app.database import init_db, import_sample_data, create_default_admin
+    from app.database import init_db, import_sample_data, create_default_admin, migrate_to_new_structure
     init_db()
     create_default_admin()
     import_sample_data()
+    migrate_to_new_structure()  # Migrate existing data to new structure
     
     # Register blueprints
     from app.routes.auth_routes import auth_bp
@@ -36,6 +37,25 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(user_bp, url_prefix='/user')
     app.register_blueprint(api_bp, url_prefix='/api')
+    
+    # Global error handler for API routes to ensure JSON responses
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        """Handle all exceptions and return JSON response"""
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Unhandled exception: {error_details}")
+        
+        # Check if this is an API route
+        if request.path.startswith('/api'):
+            return jsonify({
+                'success': False,
+                'error': str(e),
+                'type': type(e).__name__
+            }), 500
+        
+        # For non-API routes, let Flask handle it normally
+        raise
     
     # Swagger UI configuration
     SWAGGER_URL = '/swagger'

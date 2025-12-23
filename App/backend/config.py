@@ -31,8 +31,13 @@ JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
 # Application settings
-LOAN_PERIOD_DAYS = 14  # Standard loan period
+LOAN_PERIOD_DAYS = 21  # Standard loan period (return date = current date + 21 days)
 MAX_BOOKS_PER_USER = 5  # Maximum books a user can borrow at once
+
+# System date (for testing/demo purposes)
+# Set to 2018-01-01 to simulate system date in 2018
+SYSTEM_DATE = '2018-01-01'  # Format: YYYY-MM-DD
+USE_SYSTEM_DATE = True  # Set to False to use actual current date
 
 # File upload settings
 MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size for Excel uploads

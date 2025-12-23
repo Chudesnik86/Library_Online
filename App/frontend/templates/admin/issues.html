@@ -6,6 +6,7 @@
 <a href="/admin/dashboard">Панель</a>
 <a href="/admin/customers">Читатели</a>
 <a href="/admin/books">Книги</a>
+<a href="/admin/authors">Авторы</a>
 <a href="/admin/issues">Выдачи</a>
 <a href="/admin/exhibitions">Выставки</a>
 <a href="/admin/reports">Отчеты</a>
@@ -18,7 +19,11 @@
     <div class="card">
         <div class="flex-between">
             <h1 class="card-title">Управление выдачами книг</h1>
-            <button class="btn btn-success" onclick="showIssueModal()">➕ Выдать книгу</button>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-primary" onclick="showImportModal()">📥 Загрузить из Excel</button>
+                <button class="btn btn-success" onclick="showIssueModal()">➕ Выдать книгу</button>
+                <button class="btn btn-info" id="export-csv-btn" onclick="exportIssuesToCSV()" style="display: none;">📥 Экспорт в CSV</button>
+            </div>
         </div>
 
         <div class="search-bar">
@@ -35,12 +40,27 @@
             <table>
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Книга</th>
-                        <th>Читатель</th>
-                        <th>Дата выдачи</th>
-                        <th>Дата возврата</th>
-                        <th>Статус</th>
+                        <th onclick="sortIssuesTable('id')" class="sortable-header" style="cursor: pointer; user-select: none; transition: background-color 0.2s;">
+                            ID <span id="sort-indicator-id"></span>
+                        </th>
+                        <th onclick="sortIssuesTable('book_title')" class="sortable-header" style="cursor: pointer; user-select: none; transition: background-color 0.2s;">
+                            Книга <span id="sort-indicator-book_title"></span>
+                        </th>
+                        <th onclick="sortIssuesTable('customer_name')" class="sortable-header" style="cursor: pointer; user-select: none; transition: background-color 0.2s;">
+                            Читатель <span id="sort-indicator-customer_name"></span>
+                        </th>
+                        <th onclick="sortIssuesTable('date_issued')" class="sortable-header" style="cursor: pointer; user-select: none; transition: background-color 0.2s;">
+                            Дата выдачи <span id="sort-indicator-date_issued"></span>
+                        </th>
+                        <th onclick="sortIssuesTable('return_date')" class="sortable-header" style="cursor: pointer; user-select: none; transition: background-color 0.2s;">
+                            Вернуть до <span id="sort-indicator-return_date"></span>
+                        </th>
+                        <th onclick="sortIssuesTable('date_return')" class="sortable-header" style="cursor: pointer; user-select: none; transition: background-color 0.2s;">
+                            Дата возврата <span id="sort-indicator-date_return"></span>
+                        </th>
+                        <th onclick="sortIssuesTable('status')" class="sortable-header" style="cursor: pointer; user-select: none; transition: background-color 0.2s;">
+                            Статус <span id="sort-indicator-status"></span>
+                        </th>
                         <th>Действия</th>
                     </tr>
                 </thead>
@@ -75,6 +95,30 @@
             <div class="modal-footer">
                 <button type="button" class="btn" onclick="closeIssueModal()">Отмена</button>
                 <button type="submit" class="btn btn-success">Выдать</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Import Excel Modal -->
+<div id="import-modal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <span class="modal-close" onclick="closeImportModal()">&times;</span>
+            <h2 class="modal-title">Импорт выдач из Excel</h2>
+        </div>
+        <form id="import-form" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>Выберите файл Excel (.xlsx, .xls) *</label>
+                <input type="file" class="form-control" id="excel-file" accept=".xlsx,.xls" required />
+                <small style="color: #666; font-size: 0.85rem; margin-top: 0.25rem; display: block;">
+                    Формат файла: первая строка - заголовки (Book ID, Book, Customer ID, Customer, Date of issue, Return date)
+                </small>
+            </div>
+            <div id="import-results" style="display: none;"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeImportModal()">Отмена</button>
+                <button type="submit" class="btn btn-primary">Импортировать</button>
             </div>
         </form>
     </div>

@@ -62,6 +62,15 @@ def books():
     return render_template('admin/books.html', user_name=session.get('user_name'))
 
 
+@admin_bp.route('/authors')
+def authors():
+    """Manage authors"""
+    redirect_response = require_admin()
+    if redirect_response:
+        return redirect_response
+    return render_template('admin/authors.html', user_name=session.get('user_name'))
+
+
 @admin_bp.route('/issues')
 def issues():
     """Manage book issues"""

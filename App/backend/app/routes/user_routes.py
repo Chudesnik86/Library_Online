@@ -51,11 +51,19 @@ def dashboard():
 
 @user_bp.route('/browse_books')
 def browse_books():
-    """Browse available books"""
-    redirect_response = require_user()
-    if redirect_response:
-        return redirect_response
+    """Browse available books (available for unauthenticated users)"""
+    # Allow both authenticated and unauthenticated users to browse books
+    # customer_id and user_name will be None for unauthenticated users
     return render_template('user/browse_books.html', 
+                         customer_id=session.get('customer_id'),
+                         user_name=session.get('user_name'))
+
+
+@user_bp.route('/exhibitions')
+def exhibitions():
+    """View exhibitions (available for unauthenticated users)"""
+    # Allow both authenticated and unauthenticated users to view exhibitions
+    return render_template('user/exhibitions.html', 
                          customer_id=session.get('customer_id'),
                          user_name=session.get('user_name'))
 

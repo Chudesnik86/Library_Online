@@ -147,7 +147,7 @@
 
         tbody.innerHTML = issues.map(issue => {
             const daysOut = Math.floor((new Date() - new Date(issue.date_issued)) / (1000 * 60 * 60 * 24));
-            const daysLeft = 14 - daysOut;
+            const daysLeft = 21 - daysOut;
             const isOverdue = daysLeft < 0;
 
             return `
