@@ -133,3 +133,4 @@ document.getElementById('search-input').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') searchAuthors();
 });
 
+
